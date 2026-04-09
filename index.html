@@ -1,1 +1,462 @@
 
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cactus Kids</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#f5f5f0;color:#1a1a18;padding:1rem}
+.app{max-width:700px;margin:0 auto}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;padding:1rem 1.25rem;background:#fff;border-radius:12px;border:0.5px solid #e0dfd8}
+.header h2{font-size:18px;font-weight:500}
+.badge-cloud{font-size:11px;background:#e1f5ee;color:#0f6e56;border:0.5px solid #5dcaa5;padding:3px 10px;border-radius:8px}
+.nav-modulos{display:flex;gap:8px;margin-bottom:1.5rem}
+.nav-mod{flex:1;padding:10px;font-size:14px;font-weight:500;border-radius:10px;border:0.5px solid #d3d1c7;background:#fff;color:#5f5e5a;cursor:pointer;text-align:center}
+.nav-mod.active{background:#1a1a18;color:#fff;border-color:#1a1a18}
+.modulo{display:none}.modulo.active{display:block}
+.tabs{display:flex;gap:8px;margin-bottom:1.5rem}
+.tab{padding:7px 16px;font-size:14px;border:0.5px solid #b4b2a9;border-radius:8px;background:transparent;color:#5f5e5a;cursor:pointer}
+.tab.active{background:#f1efe8;color:#1a1a18;font-weight:500;border-color:#888780}
+.section{display:none}.section.active{display:block}
+.card{background:#fff;border:0.5px solid #e0dfd8;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem}
+.field-group{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.field-group.full{grid-template-columns:1fr}
+label{font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px}
+input,select,textarea{width:100%;font-size:14px;padding:8px 10px;border:0.5px solid #d3d1c7;border-radius:8px;background:#fff;color:#1a1a18;outline:none;font-family:inherit}
+input:focus,select:focus,textarea:focus{border-color:#888780}
+textarea{height:60px;resize:vertical}
+.section-title{font-size:13px;font-weight:500;color:#5f5e5a;margin:1rem 0 0.5rem;border-bottom:0.5px solid #e0dfd8;padding-bottom:6px}
+.hijo-card{background:#f1efe8;border-radius:8px;padding:0.75rem;margin-bottom:8px;position:relative}
+.hijo-card .remove{position:absolute;top:8px;right:8px;background:none;border:none;color:#5f5e5a;cursor:pointer;font-size:16px;padding:0}
+.btn-add{font-size:13px;color:#185fa5;background:#e6f1fb;border:0.5px solid #85b7eb;border-radius:8px;padding:6px 12px;cursor:pointer}
+.btn-save{width:100%;padding:10px;font-size:15px;font-weight:500;background:#e6f1fb;color:#185fa5;border:0.5px solid #85b7eb;border-radius:8px;cursor:pointer;margin-top:0.75rem}
+.search-bar{display:flex;gap:8px;margin-bottom:1rem}
+.search-bar input{flex:1}
+.cliente-row{background:#fff;border:0.5px solid #e0dfd8;border-radius:12px;padding:1rem 1.25rem;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer}
+.cliente-row:hover{border-color:#b4b2a9}
+.cliente-row.critico{border-color:#f09595;background:#fcebeb}
+.cuenta-row{background:#fff;border:0.5px solid #e0dfd8;border-radius:12px;padding:1rem 1.25rem;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer}
+.cuenta-row:hover{border-color:#b4b2a9}
+.cuenta-row.con-deuda{border-color:#f09595}
+.avatar{width:40px;height:40px;border-radius:50%;background:#e6f1fb;color:#185fa5;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:14px;flex-shrink:0}
+.avatar.critico{background:#fcebeb;color:#a32d2d}
+.avatar.deuda{background:#fcebeb;color:#a32d2d}
+.avatar.saldado{background:#e1f5ee;color:#0f6e56}
+.info{flex:1;min-width:0}
+.info strong{display:block;font-size:15px;font-weight:500}
+.info span{font-size:13px;color:#5f5e5a}
+.badge{font-size:11px;background:#f1efe8;border:0.5px solid #d3d1c7;border-radius:8px;padding:2px 8px;color:#5f5e5a;white-space:nowrap}
+.badge.vip{background:#faeeda;color:#633806;border-color:#fac775}
+.badge.critico{background:#fcebeb;color:#791f1f;border-color:#f09595;font-weight:500}
+.badge.debe{background:#fcebeb;color:#791f1f;border-color:#f09595;font-weight:500;font-size:13px;padding:4px 10px}
+.badge.saldado{background:#e1f5ee;color:#085041;border-color:#5dcaa5;font-size:13px;padding:4px 10px}
+.empty{text-align:center;padding:2rem;color:#5f5e5a;font-size:14px}
+.filtro-bar{display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap}
+.filtro{font-size:12px;padding:4px 12px;border-radius:8px;border:0.5px solid #b4b2a9;background:transparent;color:#5f5e5a;cursor:pointer}
+.filtro.active{background:#f1efe8;color:#1a1a18;border-color:#888780;font-weight:500}
+.filtro.f-critico.active{background:#fcebeb;color:#a32d2d;border-color:#f09595}
+.alerta-form{background:#fcebeb;border:1px solid #f09595;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:none}
+.alerta-form strong{display:block;font-size:14px;color:#791f1f}
+.alerta-form span{font-size:13px;color:#a32d2d}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:50;align-items:flex-start;justify-content:center;padding-top:1rem;overflow-y:auto}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border-radius:12px;border:0.5px solid #e0dfd8;padding:1.25rem;width:90%;max-width:500px;margin-bottom:1rem}
+.modal.critico-modal{border:2px solid #f09595}
+.modal-alerta{background:#fcebeb;border-radius:8px;padding:10px 14px;margin-bottom:1rem}
+.modal-alerta strong{font-size:15px;color:#791f1f;display:block}
+.modal-alerta span{font-size:13px;color:#a32d2d}
+.modal h3{font-size:16px;font-weight:500;margin-bottom:1rem}
+.modal-sub{font-size:13px;color:#5f5e5a;margin-bottom:1rem}
+.modal-field{margin-bottom:8px;font-size:14px}
+.modal-field span{color:#5f5e5a;font-size:12px;display:block}
+.modal-actions{display:flex;gap:8px;margin-top:1rem}
+.btn-edit{flex:1;padding:8px;font-size:14px;border:0.5px solid #85b7eb;color:#185fa5;background:#e6f1fb;border-radius:8px;cursor:pointer}
+.btn-delete{flex:1;padding:8px;font-size:14px;border:0.5px solid #f09595;color:#a32d2d;background:#fcebeb;border-radius:8px;cursor:pointer}
+.btn-close{flex:1;padding:8px;font-size:14px;border:0.5px solid #b4b2a9;color:#5f5e5a;background:transparent;border-radius:8px;cursor:pointer}
+.btn-cargo{flex:1;padding:8px;font-size:13px;font-weight:500;background:#fcebeb;color:#a32d2d;border:0.5px solid #f09595;border-radius:8px;cursor:pointer}
+.btn-pago{flex:1;padding:8px;font-size:13px;font-weight:500;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5;border-radius:8px;cursor:pointer}
+.btn-cerrar{width:100%;padding:8px;font-size:13px;border:0.5px solid #b4b2a9;color:#5f5e5a;background:transparent;border-radius:8px;cursor:pointer;margin-top:8px}
+.toast{position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:8px;font-size:14px;display:none;z-index:99;color:#fff;white-space:nowrap}
+.toast.ok{background:#1D9E75}.toast.err{background:#A32D2D}
+.dni-msg{font-size:12px;margin-top:4px;display:none}
+.dni-msg.err{color:#a32d2d}.dni-msg.ok{color:#0f6e56}
+.edit-section{font-size:13px;font-weight:500;color:#5f5e5a;margin:0.75rem 0 0.4rem;border-bottom:0.5px solid #e0dfd8;padding-bottom:4px}
+.edit-hijo{background:#f1efe8;border-radius:8px;padding:0.6rem;margin-bottom:6px;position:relative}
+.edit-hijo .rm{position:absolute;top:6px;right:6px;background:none;border:none;color:#5f5e5a;cursor:pointer;font-size:15px;padding:0}
+.saldo-box{background:#f1efe8;border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem}
+.saldo-box .lbl{font-size:12px;color:#5f5e5a;margin-bottom:4px}
+.saldo-box .monto{font-size:22px;font-weight:500}
+.saldo-box .monto.debe{color:#a32d2d}
+.saldo-box .monto.ok{color:#0f6e56}
+.mov-section{font-size:13px;font-weight:500;color:#5f5e5a;margin:1rem 0 0.5rem;border-bottom:0.5px solid #e0dfd8;padding-bottom:4px}
+.mov-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid #e0dfd8;font-size:13px}
+.mov-row:last-child{border-bottom:none}
+.mov-tipo{font-size:11px;padding:2px 8px;border-radius:8px;font-weight:500;flex-shrink:0}
+.mov-tipo.cargo{background:#fcebeb;color:#a32d2d}
+.mov-tipo.pago{background:#e1f5ee;color:#085041}
+.mov-desc{flex:1;color:#1a1a18}
+.mov-fecha{font-size:11px;color:#5f5e5a;white-space:nowrap}
+.mov-monto{font-weight:500;flex-shrink:0}
+.mov-monto.cargo{color:#a32d2d}
+.mov-monto.pago{color:#0f6e56}
+.mov-del{background:none;border:none;color:#b4b2a9;cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0}
+.res-item{padding:8px 12px;border-radius:8px;border:0.5px solid #d3d1c7;margin-bottom:6px;cursor:pointer;font-size:14px;background:#fff}
+.res-item:hover{border-color:#888780}
+.contador-badge{font-size:13px;color:#5f5e5a;background:#f1efe8;padding:4px 12px;border-radius:8px;border:0.5px solid #d3d1c7}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h2>Cactus Kids</h2>
+    <span class="badge-cloud">En la nube</span>
+  </div>
+
+  <div class="nav-modulos">
+    <button class="nav-mod active" id="nav-clientes" onclick="cambiarModulo('clientes')">Clientes</button>
+    <button class="nav-mod" id="nav-cuentas" onclick="cambiarModulo('cuentas')">Cuentas corrientes</button>
+  </div>
+
+  <!-- MODULO CLIENTES -->
+  <div class="modulo active" id="mod-clientes">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <div class="tabs" style="margin-bottom:0">
+        <button class="tab active" id="tab-lista" onclick="showTab('lista')">Ver clientes</button>
+        <button class="tab" id="tab-nuevo" onclick="showTab('nuevo')">+ Nuevo</button>
+      </div>
+      <span class="contador-badge" id="contador">Cargando...</span>
+    </div>
+    <div id="sec-lista" class="section active">
+      <div class="search-bar"><input type="text" id="buscador" placeholder="Buscar por nombre, DNI, tel..." oninput="renderLista()"></div>
+      <div class="filtro-bar">
+        <button class="filtro active" onclick="setFiltro('todos',this)">Todos</button>
+        <button class="filtro" onclick="setFiltro('vip',this)">VIP</button>
+        <button class="filtro" onclick="setFiltro('regular',this)">Regulares</button>
+        <button class="filtro" onclick="setFiltro('nuevo',this)">Nuevos</button>
+        <button class="filtro f-critico" onclick="setFiltro('critico',this)">Sin credito</button>
+      </div>
+      <div id="lista-clientes"><div class="empty">Conectando...</div></div>
+    </div>
+    <div id="sec-nuevo" class="section">
+      <div class="card">
+        <div class="section-title">Datos personales</div>
+        <div class="alerta-form" id="alerta-critico-form"><strong>Cliente sin credito</strong><span>No otorgar credito ni fiado.</span></div>
+        <div class="field-group">
+          <div><label>Nombre *</label><input id="f-nombre" type="text" placeholder="Maria"></div>
+          <div><label>Apellido *</label><input id="f-apellido" type="text" placeholder="Gonzalez"></div>
+        </div>
+        <div class="field-group">
+          <div>
+            <label>DNI *</label>
+            <input id="f-dni" type="text" placeholder="12345678" oninput="verificarDni()" maxlength="8">
+            <div class="dni-msg err" id="dni-alerta">Ya existe un cliente con este DNI</div>
+            <div class="dni-msg ok" id="dni-ok">DNI disponible</div>
+          </div>
+          <div><label>Fecha de nacimiento</label><input id="f-fnac" type="date"></div>
+        </div>
+        <div class="field-group">
+          <div><label>Telefono / WhatsApp</label><input id="f-tel" type="tel" placeholder="381 123 4567"></div>
+          <div><label>Email</label><input id="f-email" type="email" placeholder="maria@gmail.com"></div>
+        </div>
+        <div class="field-group">
+          <div><label>Ciudad / Barrio</label><input id="f-ciudad" type="text" placeholder="Tucuman"></div>
+          <div><label>Direccion</label><input id="f-dir" type="text" placeholder="Av. Alem 1234"></div>
+        </div>
+        <div class="field-group">
+          <div><label>Como nos conocio</label>
+            <select id="f-origen"><option value="">Seleccionar...</option><option>Redes sociales</option><option>Recomendacion</option><option>Paso por el local</option><option>WhatsApp</option><option>Otro</option></select>
+          </div>
+          <div><label>Tipo de cliente</label>
+            <select id="f-tipo" onchange="mostrarAlertaCritico()">
+              <option value="regular">Regular</option><option value="vip">VIP</option>
+              <option value="nuevo">Nuevo</option><option value="inactivo">Inactivo</option>
+              <option value="critico">Sin credito (critico)</option>
+            </select>
+          </div>
+        </div>
+        <div class="section-title">Hijos / Ninos</div>
+        <div id="hijos-container"></div>
+        <button class="btn-add" onclick="agregarHijo('hijos-container',null)">+ Agregar hijo/a</button>
+        <div class="section-title">Notas</div>
+        <div class="field-group full"><div><label>Notas internas</label><textarea id="f-notas" placeholder="Preferencias, observaciones..."></textarea></div></div>
+        <button class="btn-save" onclick="guardarCliente()">Guardar en la nube</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULO CUENTAS -->
+  <div class="modulo" id="mod-cuentas">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <div class="tabs" style="margin-bottom:0">
+        <button class="tab active" id="tab-lista-cc" onclick="showTabCC('lista')">Ver cuentas</button>
+        <button class="tab" id="tab-nuevo-cc" onclick="showTabCC('nuevo')">+ Nueva cuenta</button>
+      </div>
+      <span class="contador-badge" id="contador-cc">Cargando...</span>
+    </div>
+    <div id="sec-lista-cc" class="section active">
+      <div class="search-bar"><input type="text" id="buscador-cc" placeholder="Buscar cliente..." oninput="renderCuentas()"></div>
+      <div id="lista-cuentas"><div class="empty">Conectando...</div></div>
+    </div>
+    <div id="sec-nuevo-cc" class="section">
+      <div class="card">
+        <div class="section-title">Seleccionar cliente</div>
+        <div class="field-group full">
+          <div><label>Buscar cliente</label><input type="text" id="buscar-cli-cc" placeholder="Escribi el nombre..." oninput="buscarClienteCC()"></div>
+        </div>
+        <div id="resultados-cc" style="margin-bottom:12px;"></div>
+        <div id="cli-sel-box" style="display:none;background:#e6f1fb;border-radius:8px;padding:0.75rem 1rem;margin-bottom:12px;font-size:14px;color:#185fa5;">
+          Cliente: <strong id="cli-sel-nombre"></strong>
+        </div>
+        <div class="section-title">Primer cargo (opcional)</div>
+        <div class="field-group">
+          <div><label>Monto ($)</label><input type="number" id="cc-monto" placeholder="0" min="0"></div>
+          <div><label>Descripcion</label><input type="text" id="cc-desc" placeholder="Compra ropa nena..."></div>
+        </div>
+        <div class="field-group full"><div><label>Fecha</label><input type="date" id="cc-fecha"></div></div>
+        <button class="btn-save" onclick="crearCuenta()">Crear cuenta corriente</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-bg" onclick="cerrarModal(event)">
+  <div class="modal" id="modal-content"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const PROJ="cactus-kids-da0b0",API_KEY="AIzaSyB4MzBpmDKzcQdf7FOjdMQL0Yh8n6QOF6w";
+const BASE="https://firestore.googleapis.com/v1/projects/"+PROJ+"/databases/(default)/documents";
+let clientes=[],cuentas=[],filtroActivo='todos',hijosTemp=[],editHijosTemp=[],cliSelId=null,cliSelNombre='';
+
+async function fsGet(col){const r=await fetch(BASE+"/"+col+"?key="+API_KEY+"&pageSize=300");const d=await r.json();return(d.documents||[]).map(parseDoc);}
+async function fsAdd(col,data){const r=await fetch(BASE+"/"+col+"?key="+API_KEY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(toFs(data))});return parseDoc(await r.json());}
+async function fsPatch(col,id,data){const mask=Object.keys(data).map(k=>"updateMask.fieldPaths="+k).join("&");const r=await fetch(BASE+"/"+col+"/"+id+"?key="+API_KEY+"&"+mask,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(toFs(data))});return parseDoc(await r.json());}
+async function fsDel(col,id){await fetch(BASE+"/"+col+"/"+id+"?key="+API_KEY,{method:'DELETE'});}
+function parseDoc(doc){if(!doc.name)return doc;const id=doc.name.split('/').pop();return{id,...parseFields(doc.fields||{})};}
+function parseFields(f){const o={};for(const[k,v]of Object.entries(f)){if(v.stringValue!==undefined)o[k]=v.stringValue;else if(v.integerValue!==undefined)o[k]=Number(v.integerValue);else if(v.doubleValue!==undefined)o[k]=Number(v.doubleValue);else if(v.booleanValue!==undefined)o[k]=v.booleanValue;else if(v.arrayValue)o[k]=(v.arrayValue.values||[]).map(x=>parseFields(x.mapValue&&x.mapValue.fields||{}));else if(v.mapValue)o[k]=parseFields(v.mapValue.fields||{});else o[k]=null;}return o;}
+function toFs(data){const fields={};for(const[k,v]of Object.entries(data)){if(typeof v==='string')fields[k]={stringValue:v};else if(typeof v==='number')fields[k]={doubleValue:v};else if(typeof v==='boolean')fields[k]={booleanValue:v};else if(Array.isArray(v))fields[k]={arrayValue:{values:v.map(x=>({mapValue:{fields:toFs(x).fields}}))}};else fields[k]={nullValue:null};}return{fields};}
+
+async function init(){
+  try{
+    [clientes,cuentas]=await Promise.all([fsGet('clientes'),fsGet('cuentas')]);
+    renderLista();renderCuentas();
+  }catch(e){document.getElementById('lista-clientes').innerHTML='<div class="empty">Error al conectar.</div>';}
+}
+
+function cambiarModulo(m){
+  document.getElementById('mod-clientes').classList.toggle('active',m==='clientes');
+  document.getElementById('mod-cuentas').classList.toggle('active',m==='cuentas');
+  document.getElementById('nav-clientes').classList.toggle('active',m==='clientes');
+  document.getElementById('nav-cuentas').classList.toggle('active',m==='cuentas');
+}
+
+function showTab(t){
+  document.getElementById('tab-lista').classList.toggle('active',t==='lista');
+  document.getElementById('tab-nuevo').classList.toggle('active',t==='nuevo');
+  document.getElementById('sec-lista').classList.toggle('active',t==='lista');
+  document.getElementById('sec-nuevo').classList.toggle('active',t==='nuevo');
+  if(t==='lista')renderLista();
+}
+
+function showTabCC(t){
+  document.getElementById('tab-lista-cc').classList.toggle('active',t==='lista');
+  document.getElementById('tab-nuevo-cc').classList.toggle('active',t==='nuevo');
+  document.getElementById('sec-lista-cc').classList.toggle('active',t==='lista');
+  document.getElementById('sec-nuevo-cc').classList.toggle('active',t==='nuevo');
+  if(t==='lista')renderCuentas();
+}
+
+function setFiltro(f,el){filtroActivo=f;document.querySelectorAll('.filtro').forEach(b=>b.classList.remove('active'));el.classList.add('active');renderLista();}
+function mostrarAlertaCritico(){document.getElementById('alerta-critico-form').style.display=document.getElementById('f-tipo').value==='critico'?'block':'none';}
+function verificarDni(){const dni=document.getElementById('f-dni').value.trim();const a=document.getElementById('dni-alerta'),o=document.getElementById('dni-ok');if(dni.length<7){a.style.display='none';o.style.display='none';return;}const e=clientes.find(c=>c.dni===dni);a.style.display=e?'block':'none';o.style.display=(!e&&dni.length>=7)?'block':'none';}
+
+function agregarHijo(containerId,datos){
+  const id=Date.now()+Math.floor(Math.random()*1000);
+  const arr=containerId==='hijos-container'?hijosTemp:editHijosTemp;
+  arr.push(id);
+  const c=document.getElementById(containerId);
+  const d=document.createElement('div');
+  const isEdit=containerId!=='hijos-container';
+  d.className=isEdit?'edit-hijo':'hijo-card';d.id='hijo-'+id;
+  const rmCls=isEdit?'rm':'remove';
+  const fg=isEdit?'field-group" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px':'field-group';
+  const talles=['RN','0-3M','3-6M','6-9M','9-12M','12-18M','18-24M','2','3','4','5','6','7','8','10','12','14'];
+  const tSel=datos&&datos.talle?datos.talle:'';const gSel=datos&&datos.genero?datos.genero:'';
+  d.innerHTML='<button class="'+rmCls+'" onclick="quitarHijo('+id+',\''+containerId+'\')">x</button><div class="'+fg+'"><div><label>Nombre</label><input type="text" id="h-nombre-'+id+'" value="'+(datos&&datos.nombre||'')+'" placeholder="Lucia" style="width:100%;font-size:14px;padding:6px 8px;border:0.5px solid #d3d1c7;border-radius:8px;"></div><div><label>Fecha de nac.</label><input type="date" id="h-fecha-'+id+'" value="'+(datos&&datos.fechaNac||'')+'" style="width:100%;font-size:14px;padding:6px 8px;border:0.5px solid #d3d1c7;border-radius:8px;"></div></div><div class="'+fg+'"><div><label>Talle</label><select id="h-talle-'+id+'" style="width:100%;font-size:14px;padding:6px 8px;border:0.5px solid #d3d1c7;border-radius:8px;"><option value="">--</option>'+talles.map(t=>'<option'+(t===tSel?' selected':'')+'>'+t+'</option>').join('')+'</select></div><div><label>Genero</label><select id="h-genero-'+id+'" style="width:100%;font-size:14px;padding:6px 8px;border:0.5px solid #d3d1c7;border-radius:8px;"><option value="">--</option>'+['Nena','Nene','Indistinto'].map(g=>'<option'+(g===gSel?' selected':'')+'>'+g+'</option>').join('')+'</select></div></div>';
+  c.appendChild(d);
+}
+
+function quitarHijo(id,containerId){if(containerId==='hijos-container')hijosTemp=hijosTemp.filter(h=>h!==id);else editHijosTemp=editHijosTemp.filter(h=>h!==id);document.getElementById('hijo-'+id).remove();}
+function getHijos(arr){return arr.map(id=>({nombre:document.getElementById('h-nombre-'+id).value,fechaNac:document.getElementById('h-fecha-'+id).value,talle:document.getElementById('h-talle-'+id).value,genero:document.getElementById('h-genero-'+id).value}));}
+
+async function guardarCliente(){
+  const nombre=document.getElementById('f-nombre').value.trim();
+  const apellido=document.getElementById('f-apellido').value.trim();
+  const dni=document.getElementById('f-dni').value.trim();
+  if(!nombre||!apellido){toast('Completa nombre y apellido','err');return;}
+  if(!dni){toast('El DNI es obligatorio','err');return;}
+  if(clientes.find(c=>c.dni===dni)){toast('Ya existe un cliente con ese DNI','err');return;}
+  const c={nombre,apellido,dni,fnac:document.getElementById('f-fnac').value,tel:document.getElementById('f-tel').value,email:document.getElementById('f-email').value,ciudad:document.getElementById('f-ciudad').value,dir:document.getElementById('f-dir').value,origen:document.getElementById('f-origen').value,tipo:document.getElementById('f-tipo').value,notas:document.getElementById('f-notas').value,hijos:getHijos(hijosTemp),fechaAlta:new Date().toISOString()};
+  try{const doc=await fsAdd('clientes',c);clientes.unshift(doc);limpiarForm();toast('Cliente guardado!','ok');showTab('lista');}
+  catch(e){toast('Error al guardar','err');}
+}
+
+function limpiarForm(){['f-nombre','f-apellido','f-dni','f-fnac','f-tel','f-email','f-ciudad','f-dir','f-notas'].forEach(id=>document.getElementById(id).value='');document.getElementById('f-origen').selectedIndex=0;document.getElementById('f-tipo').selectedIndex=0;document.getElementById('hijos-container').innerHTML='';document.getElementById('dni-alerta').style.display='none';document.getElementById('dni-ok').style.display='none';document.getElementById('alerta-critico-form').style.display='none';hijosTemp=[];}
+
+function val(v){return v&&v.trim()?v:'—';}
+
+function renderLista(){
+  const q=(document.getElementById('buscador').value||'').toLowerCase();
+  document.getElementById('contador').textContent=clientes.length+' cliente'+(clientes.length!==1?'s':'');
+  let f=clientes.filter(c=>(c.nombre+' '+c.apellido+' '+(c.dni||'')+' '+(c.tel||'')+' '+(c.ciudad||'')).toLowerCase().includes(q));
+  if(filtroActivo!=='todos')f=f.filter(c=>c.tipo===filtroActivo);
+  f.sort((a,b)=>(a.tipo==='critico'?0:1)-(b.tipo==='critico'?0:1));
+  const el=document.getElementById('lista-clientes');
+  if(!f.length){el.innerHTML='<div class="empty">No hay clientes. Agrega el primero!</div>';return;}
+  el.innerHTML=f.map(c=>{
+    const ini=(c.nombre[0]||'')+(c.apellido[0]||'');
+    const cr=c.tipo==='critico';
+    const hj=c.hijos&&c.hijos.length?'<span class="badge">'+c.hijos.length+' hijo'+(c.hijos.length>1?'s':'')+'</span>':'';
+    const tp=cr?'<span class="badge critico">Sin credito</span>':c.tipo==='vip'?'<span class="badge vip">VIP</span>':'';
+    return'<div class="cliente-row'+(cr?' critico':'')+'" onclick="verCliente(\''+c.id+'\')"><div class="avatar'+(cr?' critico':'')+'">'+ini.toUpperCase()+'</div><div class="info"><strong>'+c.nombre+' '+c.apellido+'</strong><span>DNI '+(c.dni||'—')+' · '+(c.tel||'Sin tel')+(c.ciudad?' · '+c.ciudad:'')+'</span></div><div style="display:flex;gap:4px;flex-shrink:0;">'+hj+tp+'</div></div>';
+  }).join('');
+}
+
+function verCliente(id){
+  const c=clientes.find(x=>x.id===id);if(!c)return;
+  const cr=c.tipo==='critico';
+  const hj=c.hijos&&c.hijos.length?c.hijos.map(h=>'<div style="background:#f1efe8;border-radius:8px;padding:8px;margin-bottom:6px;font-size:13px;"><strong>'+(h.nombre||'Sin nombre')+'</strong><br>'+(h.fechaNac?'Nac: '+h.fechaNac+' · ':'')+( h.talle?'Talle: '+h.talle:'')+(h.genero?' · '+h.genero:'')+'</div>').join(''):'<span style="color:#5f5e5a;font-size:13px;">Sin hijos registrados</span>';
+  const al=cr?'<div class="modal-alerta"><strong>No otorgar credito ni fiado</strong><span>Cliente critico.</span></div>':'';
+  const m=document.getElementById('modal-content');
+  m.className='modal'+(cr?' critico-modal':'');
+  m.innerHTML=al+'<h3>'+c.nombre+' '+c.apellido+'</h3>'+'<div class="modal-field"><span>DNI</span>'+val(c.dni)+'</div>'+'<div class="modal-field"><span>Fecha de nacimiento</span>'+val(c.fnac)+'</div>'+'<div class="modal-field"><span>Telefono</span>'+val(c.tel)+'</div>'+'<div class="modal-field"><span>Email</span>'+val(c.email)+'</div>'+'<div class="modal-field"><span>Ciudad</span>'+val(c.ciudad)+'</div>'+'<div class="modal-field"><span>Direccion</span>'+val(c.dir)+'</div>'+'<div class="modal-field"><span>Como llego</span>'+val(c.origen)+'</div>'+'<div class="modal-field"><span>Tipo</span>'+(c.tipo||'regular')+'</div>'+'<div class="modal-field"><span>Alta</span>'+(c.fechaAlta?new Date(c.fechaAlta).toLocaleDateString('es-AR'):'—')+'</div>'+'<div class="modal-field"><span>Hijos</span>'+hj+'</div>'+'<div class="modal-field"><span>Notas</span>'+val(c.notas)+'</div>'+'<div class="modal-actions"><button class="btn-edit" onclick="editarCliente(\''+c.id+'\')">Editar</button><button class="btn-delete" onclick="eliminarCliente(\''+c.id+'\')">Eliminar</button><button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>';
+  document.getElementById('modal-bg').classList.add('open');
+}
+
+function editarCliente(id){
+  const c=clientes.find(x=>x.id===id);if(!c)return;
+  editHijosTemp=[];
+  const m=document.getElementById('modal-content');m.className='modal';
+  m.innerHTML='<h3>Editar cliente</h3>'+'<div class="edit-section">Datos personales</div>'+'<div class="alerta-form" id="edit-alerta" style="'+(c.tipo==='critico'?'display:block':'display:none')+'"><strong>Cliente sin credito</strong><span>No otorgar credito ni fiado.</span></div>'+'<div class="field-group"><div><label>Nombre *</label><input id="e-nombre" type="text" value="'+(c.nombre||'')+'" style="width:100%"></div><div><label>Apellido *</label><input id="e-apellido" type="text" value="'+(c.apellido||'')+'" style="width:100%"></div></div>'+'<div class="field-group"><div><label>DNI</label><input id="e-dni" type="text" value="'+(c.dni||'')+'" maxlength="8" style="width:100%"></div><div><label>Fecha de nac.</label><input id="e-fnac" type="date" value="'+(c.fnac||'')+'" style="width:100%"></div></div>'+'<div class="field-group"><div><label>Telefono</label><input id="e-tel" type="tel" value="'+(c.tel||'')+'" style="width:100%"></div><div><label>Email</label><input id="e-email" type="email" value="'+(c.email||'')+'" style="width:100%"></div></div>'+'<div class="field-group"><div><label>Ciudad</label><input id="e-ciudad" type="text" value="'+(c.ciudad||'')+'" style="width:100%"></div><div><label>Direccion</label><input id="e-dir" type="text" value="'+(c.dir||'')+'" style="width:100%"></div></div>'+'<div class="field-group"><div><label>Como nos conocio</label><select id="e-origen" style="width:100%"><option value="">Seleccionar...</option>'+['Redes sociales','Recomendacion','Paso por el local','WhatsApp','Otro'].map(o=>'<option'+(c.origen===o?' selected':'')+'>'+o+'</option>').join('')+'</select></div><div><label>Tipo</label><select id="e-tipo" style="width:100%" onchange="document.getElementById(\'edit-alerta\').style.display=this.value===\'critico\'?\'block\':\'none\'">'+[['regular','Regular'],['vip','VIP'],['nuevo','Nuevo'],['inactivo','Inactivo'],['critico','Sin credito (critico)']].map(([v,l])=>'<option value="'+v+'"'+(c.tipo===v?' selected':'')+'>'+l+'</option>').join('')+'</select></div></div>'+'<div class="edit-section">Hijos / Ninos</div>'+'<div id="edit-hijos-container"></div>'+'<button class="btn-add" onclick="agregarHijo(\'edit-hijos-container\',null)">+ Agregar hijo/a</button>'+'<div class="edit-section" style="margin-top:0.75rem">Notas</div>'+'<textarea id="e-notas" style="width:100%;font-size:14px;height:60px;resize:vertical;padding:8px;border:0.5px solid #d3d1c7;border-radius:8px;margin-bottom:12px;">'+(c.notas||'')+'</textarea>'+'<div class="modal-actions"><button class="btn-save" style="flex:2" onclick="guardarEdicion(\''+id+'\')">Guardar cambios</button><button class="btn-close" onclick="verCliente(\''+id+'\')">Cancelar</button></div>';
+  if(c.hijos&&c.hijos.length){c.hijos.forEach(h=>agregarHijo('edit-hijos-container',h));}
+}
+
+async function guardarEdicion(id){
+  const nombre=document.getElementById('e-nombre').value.trim();
+  const apellido=document.getElementById('e-apellido').value.trim();
+  if(!nombre||!apellido){toast('Completa nombre y apellido','err');return;}
+  const datos={nombre,apellido,dni:document.getElementById('e-dni').value.trim(),fnac:document.getElementById('e-fnac').value,tel:document.getElementById('e-tel').value,email:document.getElementById('e-email').value,ciudad:document.getElementById('e-ciudad').value,dir:document.getElementById('e-dir').value,origen:document.getElementById('e-origen').value,tipo:document.getElementById('e-tipo').value,notas:document.getElementById('e-notas').value,hijos:getHijos(editHijosTemp)};
+  try{await fsPatch('clientes',id,datos);const idx=clientes.findIndex(c=>c.id===id);if(idx>=0)clientes[idx]={...clientes[idx],...datos};toast('Cliente actualizado!','ok');cerrarModal();renderLista();}
+  catch(e){toast('Error al guardar cambios','err');}
+}
+
+async function eliminarCliente(id){
+  if(!confirm('Eliminar este cliente?'))return;
+  try{await fsDel('clientes',id);clientes=clientes.filter(c=>c.id!==id);cerrarModal();renderLista();toast('Cliente eliminado','ok');}
+  catch(e){toast('Error al eliminar','err');}
+}
+
+function saldo(c){return(c.movimientos||[]).reduce((t,m)=>m.tipo==='cargo'?t+m.monto:t-m.monto,0);}
+function fmt(n){return '$'+Math.round(n).toLocaleString('es-AR');}
+
+function buscarClienteCC(){
+  const q=document.getElementById('buscar-cli-cc').value.toLowerCase().trim();
+  const res=document.getElementById('resultados-cc');
+  if(q.length<2){res.innerHTML='';return;}
+  const yaConCuenta=cuentas.map(c=>c.clienteId);
+  const encontrados=clientes.filter(c=>!yaConCuenta.includes(c.id)&&(c.nombre+' '+c.apellido+' '+(c.dni||'')).toLowerCase().includes(q)).slice(0,5);
+  if(!encontrados.length){res.innerHTML='<div style="font-size:13px;color:#5f5e5a;padding:4px 0;">No encontrado o ya tiene cuenta.</div>';return;}
+  res.innerHTML=encontrados.map(c=>'<div class="res-item" onclick="selCliCC(\''+c.id+'\',\''+c.nombre+' '+c.apellido+'\')"><strong>'+c.nombre+' '+c.apellido+'</strong> <span style="color:#5f5e5a;font-size:12px;">DNI '+(c.dni||'—')+'</span></div>').join('');
+}
+
+function selCliCC(id,nombre){
+  cliSelId=id;cliSelNombre=nombre;
+  document.getElementById('buscar-cli-cc').value='';
+  document.getElementById('resultados-cc').innerHTML='';
+  document.getElementById('cli-sel-box').style.display='block';
+  document.getElementById('cli-sel-nombre').textContent=nombre;
+}
+
+async function crearCuenta(){
+  if(!cliSelId){toast('Selecciona un cliente primero','err');return;}
+  const monto=parseFloat(document.getElementById('cc-monto').value)||0;
+  const desc=document.getElementById('cc-desc').value.trim();
+  const fecha=document.getElementById('cc-fecha').value||new Date().toISOString().slice(0,10);
+  const movimientos=monto>0?[{tipo:'cargo',monto,desc:desc||'Cargo inicial',fecha,id:Date.now()}]:[];
+  try{
+    const doc=await fsAdd('cuentas',{clienteId:cliSelId,clienteNombre:cliSelNombre,movimientos,fechaCreacion:new Date().toISOString()});
+    cuentas.unshift(doc);
+    cliSelId=null;cliSelNombre='';
+    document.getElementById('buscar-cli-cc').value='';
+    document.getElementById('cli-sel-box').style.display='none';
+    document.getElementById('cc-monto').value='';
+    document.getElementById('cc-desc').value='';
+    document.getElementById('cc-fecha').value='';
+    toast('Cuenta creada!','ok');showTabCC('lista');
+  }catch(e){toast('Error al crear cuenta','err');}
+}
+
+function renderCuentas(){
+  const q=(document.getElementById('buscador-cc').value||'').toLowerCase();
+  const el=document.getElementById('lista-cuentas');
+  const deudores=cuentas.filter(c=>saldo(c)>0).length;
+  document.getElementById('contador-cc').textContent=cuentas.length+' cuenta'+(cuentas.length!==1?'s':'')+' · '+deudores+' con deuda';
+  const f=cuentas.filter(c=>(c.clienteNombre||'').toLowerCase().includes(q));
+  f.sort((a,b)=>saldo(b)-saldo(a));
+  if(!f.length){el.innerHTML='<div class="empty">No hay cuentas. Crea la primera!</div>';return;}
+  el.innerHTML=f.map(c=>{
+    const s=saldo(c);
+    const ini=(c.clienteNombre||'??').split(' ').map(p=>p[0]||'').slice(0,2).join('').toUpperCase();
+    const cls=s>0?'deuda':'saldado';
+    const badge=s>0?'<span class="badge debe">Debe '+fmt(s)+'</span>':'<span class="badge saldado">Saldado</span>';
+    return'<div class="cuenta-row'+(s>0?' con-deuda':'')+'" onclick="verCuenta(\''+c.id+'\')"><div class="avatar '+cls+'">'+ini+'</div><div class="info"><strong>'+c.clienteNombre+'</strong><span>'+(c.movimientos||[]).length+' movimiento'+((c.movimientos||[]).length!==1?'s':'')+'</span></div>'+badge+'</div>';
+  }).join('');
+}
+
+function verCuenta(id){
+  const c=cuentas.find(x=>x.id===id);if(!c)return;
+  const s=saldo(c);
+  const movs=(c.movimientos||[]).slice().sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  const movsHtml=movs.length?movs.map(m=>'<div class="mov-row"><span class="mov-tipo '+m.tipo+'">'+(m.tipo==='cargo'?'Cargo':'Pago')+'</span><span class="mov-desc">'+(m.desc||'—')+'</span><span class="mov-fecha">'+(m.fecha||'—')+'</span><span class="mov-monto '+m.tipo+'">'+(m.tipo==='cargo'?'+':'-')+fmt(m.monto)+'</span><button class="mov-del" onclick="eliminarMov(\''+id+'\','+m.id+')">×</button></div>').join(''):'<div style="font-size:13px;color:#5f5e5a;padding:0.5rem 0;">Sin movimientos aun.</div>';
+  const m=document.getElementById('modal-content');
+  m.className='modal';
+  m.innerHTML='<h3>'+c.clienteNombre+'</h3><div class="modal-sub">Cuenta corriente</div>'+'<div class="saldo-box"><div class="lbl">Saldo actual</div><div class="monto '+(s>0?'debe':'ok')+'">'+(s>0?'Debe '+fmt(s):'Saldado')+'</div></div>'+'<div class="mov-section">Registrar movimiento</div>'+'<div class="field-group" style="margin-bottom:8px;"><div><label>Monto ($)</label><input type="number" id="m-monto" placeholder="0" min="0" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div><div><label>Fecha</label><input type="date" id="m-fecha" value="'+new Date().toISOString().slice(0,10)+'" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div></div>'+'<div style="margin-bottom:10px;"><label style="font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px;">Descripcion</label><input type="text" id="m-desc" placeholder="Detalle..." style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div>'+'<div style="display:flex;gap:8px;margin-bottom:1rem;"><button class="btn-cargo" onclick="agregarMov(\''+id+'\',\'cargo\')">+ Cargo</button><button class="btn-pago" onclick="agregarMov(\''+id+'\',\'pago\')">+ Pago</button></div>'+'<div class="mov-section">Historial</div>'+movsHtml+'<button class="btn-cerrar" onclick="cerrarModal()">Cerrar</button>';
+  document.getElementById('modal-bg').classList.add('open');
+}
+
+async function agregarMov(cuentaId,tipo){
+  const monto=parseFloat(document.getElementById('m-monto').value)||0;
+  const desc=document.getElementById('m-desc').value.trim();
+  const fecha=document.getElementById('m-fecha').value||new Date().toISOString().slice(0,10);
+  if(!monto){toast('Ingresa un monto','err');return;}
+  const c=cuentas.find(x=>x.id===cuentaId);
+  const nuevo={tipo,monto,desc:desc||(tipo==='cargo'?'Cargo':'Pago'),fecha,id:Date.now()};
+  const movs=[...(c.movimientos||[]),nuevo];
+  try{
+    await fsPatch('cuentas',cuentaId,{clienteId:c.clienteId,clienteNombre:c.clienteNombre,movimientos:movs,fechaCreacion:c.fechaCreacion||''});
+    c.movimientos=movs;toast(tipo==='cargo'?'Cargo registrado!':'Pago registrado!','ok');
+    cerrarModal();renderCuentas();setTimeout(()=>verCuenta(cuentaId),200);
+  }catch(e){toast('Error al guardar','err');}
+}
+
+async function eliminarMov(cuentaId,movId){
+  if(!confirm('Eliminar este movimiento?'))return;
+  const c=cuentas.find(x=>x.id===cuentaId);
+  const movs=(c.movimientos||[]).filter(m=>m.id!==movId);
+  try{
+    await fsPatch('cuentas',cuentaId,{clienteId:c.clienteId,clienteNombre:c.clienteNombre,movimientos:movs,fechaCreacion:c.fechaCreacion||''});
+    c.movimientos=movs;cerrarModal();renderCuentas();setTimeout(()=>verCuenta(cuentaId),200);
+  }catch(e){toast('Error al eliminar','err');}
+}
+
+function cerrarModal(e){if(!e||e.target===document.getElementById('modal-bg'))document.getElementById('modal-bg').classList.remove('open');}
+document.getElementById('modal-bg').addEventListener('click',cerrarModal);
+function toast(msg,tipo){const t=document.getElementById('toast');t.textContent=msg;t.className='toast '+(tipo||'ok');t.style.display='block';setTimeout(()=>t.style.display='none',2800);}
+
+init();
+</script>
+</body>
+</html>
