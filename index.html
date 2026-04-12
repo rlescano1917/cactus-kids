@@ -245,6 +245,30 @@ textarea{height:60px;resize:vertical}
         <div class="alerta-fiado" id="alerta-fiado" style="display:none">
           <strong>Venta a credito / fiado</strong>
           <span>Se va a registrar automaticamente en la cuenta corriente del cliente.</span>
+          <div style="margin-top:12px;">
+            <label style="font-size:12px;color:#a32d2d;display:block;margin-bottom:6px;">Modalidad de pago</label>
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+              <button id="mod-unico" onclick="setModalidadFiado('unico')" style="flex:1;padding:8px;font-size:13px;font-weight:500;border-radius:8px;border:0.5px solid #f09595;background:#fff;color:#a32d2d;cursor:pointer">Pago unico</button>
+              <button id="mod-cuotas" onclick="setModalidadFiado('cuotas')" style="flex:1;padding:8px;font-size:13px;font-weight:500;border-radius:8px;border:0.5px solid #f09595;background:#fff;color:#a32d2d;cursor:pointer">En cuotas</button>
+            </div>
+            <div id="fiado-unico" style="display:none">
+              <label style="font-size:12px;color:#a32d2d;display:block;margin-bottom:4px;">Fecha de vencimiento</label>
+              <input type="date" id="v-vencimiento" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #f09595;border-radius:8px;background:#fff;">
+            </div>
+            <div id="fiado-cuotas" style="display:none">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;">
+                <div>
+                  <label style="font-size:12px;color:#a32d2d;display:block;margin-bottom:4px;">Cantidad de cuotas</label>
+                  <input type="number" id="v-ncuotas" min="2" max="24" value="2" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #f09595;border-radius:8px;background:#fff;" oninput="generarCuotas()">
+                </div>
+                <div>
+                  <label style="font-size:12px;color:#a32d2d;display:block;margin-bottom:4px;">Primera cuota</label>
+                  <input type="date" id="v-primera-cuota" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #f09595;border-radius:8px;background:#fff;" oninput="generarCuotas()">
+                </div>
+              </div>
+              <div id="cuotas-detalle" style="font-size:13px;color:#a32d2d;"></div>
+            </div>
+          </div>
         </div>
 
         <div class="field-group full" style="margin-top:8px">
@@ -390,6 +414,41 @@ window.calcTotal=function(){
 
 window.selPago=function(tipo){pagoSel=tipo;['efectivo','transferencia','tarjeta','fiado'].forEach(t=>{const b=document.getElementById('pago-'+t);b.className='pago-btn'+(tipo===t?' selected '+t:'');});document.getElementById('alerta-fiado').style.display=tipo==='fiado'?'block':'none';}
 
+
+let modalidadFiado='unico';
+
+window.setModalidadFiado=function(m){
+  modalidadFiado=m;
+  document.getElementById('fiado-unico').style.display=m==='unico'?'block':'none';
+  document.getElementById('fiado-cuotas').style.display=m==='cuotas'?'block':'none';
+  document.getElementById('mod-unico').style.background=m==='unico'?'#fcebeb':'#fff';
+  document.getElementById('mod-cuotas').style.background=m==='cuotas'?'#fcebeb':'#fff';
+  if(m==='cuotas') generarCuotas();
+}
+
+window.generarCuotas=function(){
+  const n=parseInt(document.getElementById('v-ncuotas')?.value)||2;
+  const primera=document.getElementById('v-primera-cuota')?.value;
+  const det=document.getElementById('cuotas-detalle');
+  if(!primera||!det) return;
+  const total=window._totalCalculado||0;
+  const monto=Math.round(total/n);
+  const montoUlt=total-(monto*(n-1));
+  let html='<div style="margin-top:8px;">';
+  for(let i=0;i<n;i++){
+    const fecha=new Date(primera+'T00:00:00');
+    fecha.setMonth(fecha.getMonth()+i);
+    const fechaStr=fecha.toISOString().slice(0,10);
+    const m=i===n-1?montoUlt:monto;
+    html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:0.5px solid #f09595;font-size:12px;">'
+      +'<span>Cuota '+(i+1)+'/'+n+' · '+fechaStr+'</span>'
+      +'<span style="font-weight:500">$'+m.toLocaleString('es-AR')+'</span>'
+      +'</div>';
+  }
+  html+='</div>';
+  det.innerHTML=html;
+}
+
 window.guardarVenta=async function(){
   if(!cliSelVId){toast('Selecciona un cliente','err');return;}
   if(productosTemp.length===0){toast('Agrega al menos un producto','err');return;}
@@ -404,20 +463,37 @@ window.guardarVenta=async function(){
     ventas.unshift(doc);
     if(pagoSel==='fiado'){
       let cuenta=cuentas.find(c=>c.clienteId===cliSelVId);
-      const mov={tipo:'cargo',monto:total,desc:'Venta '+(productos.map(p=>p.desc).join(', ')).substring(0,50),fecha,id:Date.now()};
+      let nuevosMovs=[];
+      const descBase='Venta '+(productos.map(p=>p.desc).join(', ')).substring(0,40);
+      if(modalidadFiado==='cuotas'){
+        const n=parseInt(document.getElementById('v-ncuotas').value)||2;
+        const primera=document.getElementById('v-primera-cuota').value;
+        const montoCuota=Math.round(total/n);
+        const montoUlt=total-(montoCuota*(n-1));
+        for(let i=0;i<n;i++){
+          const fechaCuota=new Date(primera+'T00:00:00');
+          fechaCuota.setMonth(fechaCuota.getMonth()+i);
+          const fechaStr=fechaCuota.toISOString().slice(0,10);
+          const m=i===n-1?montoUlt:montoCuota;
+          nuevosMovs.push({tipo:'cargo',monto:m,desc:descBase+' (cuota '+(i+1)+'/'+n+')',fecha,vencimiento:fechaStr,id:Date.now()+i});
+        }
+      } else {
+        const vencimientoFiado=document.getElementById('v-vencimiento').value||'';
+        nuevosMovs.push({tipo:'cargo',monto:total,desc:descBase,fecha,vencimiento:vencimientoFiado,id:Date.now()});
+      }
       if(cuenta){
-        const movs=[...(cuenta.movimientos||[]),mov];
+        const movs=[...(cuenta.movimientos||[]),...nuevosMovs];
         await fsPatch('cuentas',cuenta.id,{clienteId:cuenta.clienteId,clienteNombre:cuenta.clienteNombre,movimientos:movs,fechaCreacion:cuenta.fechaCreacion||''});
         cuenta.movimientos=movs;
       }else{
-        const newCuenta=await fsAdd('cuentas',{clienteId:cliSelVId,clienteNombre:cliSelVNombre,movimientos:[mov],fechaCreacion:new Date().toISOString()});
+        const newCuenta=await fsAdd('cuentas',{clienteId:cliSelVId,clienteNombre:cliSelVNombre,movimientos:nuevosMovs,fechaCreacion:new Date().toISOString()});
         cuentas.unshift(newCuenta);
       }
     }
     cliSelVId=null;cliSelVNombre='';pagoSel=null;productosTemp=[];
     document.getElementById('buscar-cli-v').value='';document.getElementById('cli-sel-v').style.display='none';
     document.getElementById('productos-container').innerHTML='';document.getElementById('total-venta').textContent='$0';document.getElementById('aj-tipo').selectedIndex=0;document.getElementById('aj-valor').value='';document.getElementById('aj-resultado').textContent='';document.getElementById('subtotal-label').textContent='';window._totalCalculado=0;window._ajLabel='';
-    document.getElementById('v-notas').value='';document.getElementById('alerta-fiado').style.display='none';
+    document.getElementById('v-notas').value='';if(document.getElementById('v-vencimiento'))document.getElementById('v-vencimiento').value='';if(document.getElementById('v-primera-cuota'))document.getElementById('v-primera-cuota').value='';if(document.getElementById('cuotas-detalle'))document.getElementById('cuotas-detalle').innerHTML='';modalidadFiado='unico';document.getElementById('fiado-unico').style.display='none';document.getElementById('fiado-cuotas').style.display='none';document.getElementById('alerta-fiado').style.display='none';
     ['efectivo','transferencia','tarjeta','fiado'].forEach(t=>document.getElementById('pago-'+t).className='pago-btn');
     toast('Venta registrada!','ok');window.showTabV('lista');
   }catch(e){toast('Error al registrar venta','err');}
