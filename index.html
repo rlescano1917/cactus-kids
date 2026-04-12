@@ -578,7 +578,8 @@ const m=document.getElementById('modal-content');m.className='modal';const est=e
   const estBadge='<span class="estado-'+est+'" style="margin-bottom:1rem;display:inline-block">'+{saldado:'Saldado',aldia:'Al dia',porVencer:'Por vencer',vencida:'VENCIDA'}[est]+'</span>';
   m.innerHTML='<h3>'+c.clienteNombre+'</h3>'+estBadge+vencInfo+limiteInfo+'<div style="background:#f1efe8;border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem"><div style="font-size:12px;color:#5f5e5a;margin-bottom:4px">Saldo actual</div><div style="font-size:22px;font-weight:500;'+(s>0?'color:#a32d2d':'color:#0f6e56')+'">'+(s>0?'Debe '+fmt(s):'Saldado')+'</div></div>'+'<div style="font-size:13px;font-weight:500;color:#5f5e5a;margin:1rem 0 0.5rem;border-bottom:0.5px solid #e0dfd8;padding-bottom:4px">Registrar movimiento</div>'+'<div class="field-group" style="margin-bottom:8px;"><div><label>Monto ($)</label><input type="number" id="m-monto" placeholder="0" min="0" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div><div><label>Fecha del cargo</label><input type="date" id="m-fecha" value="'+new Date().toISOString().slice(0,10)+'" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div></div>'+'<div style="margin-bottom:10px;"><label style="font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px;">Fecha de vencimiento (solo para cargos)</label><input type="date" id="m-vencimiento" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div>'+'<div style="margin-bottom:10px;"><label style="font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px;">Descripcion</label><input type="text" id="m-desc" placeholder="Detalle..." style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div>'+'<div style="display:flex;gap:8px;margin-bottom:1rem;"><button style="flex:1;padding:8px;font-size:13px;font-weight:500;background:#fcebeb;color:#a32d2d;border:0.5px solid #f09595;border-radius:8px;cursor:pointer" onclick="agregarMov(\''+id+'\',\'cargo\')">+ Cargo</button><button style="flex:1;padding:8px;font-size:13px;font-weight:500;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5;border-radius:8px;cursor:pointer" onclick="agregarMov(\''+id+'\',\'pago\')">+ Pago</button></div>'+'<div style="font-size:13px;font-weight:500;color:#5f5e5a;margin:1rem 0 0.5rem;border-bottom:0.5px solid #e0dfd8;padding-bottom:4px">Historial</div>'+movsHtml+'<div id="mora-box" style="margin-top:1rem;"></div>'
   +'<button style="width:100%;padding:8px;font-size:13px;border:0.5px solid #b4b2a9;color:#5f5e5a;background:transparent;border-radius:8px;cursor:pointer;margin-top:8px" onclick="cerrarModal()">Cerrar</button>';
-  calcularMora(id);document.getElementById('modal-bg').classList.add('open');}
+  document.getElementById('modal-bg').classList.add('open');
+  calcularMora(id);}
 
 window.agregarMov=async function(cuentaId,tipo){const monto=parseFloat(document.getElementById('m-monto').value)||0;const desc=document.getElementById('m-desc').value.trim();const fecha=document.getElementById('m-fecha').value||new Date().toISOString().slice(0,10);const vencimiento=tipo==='cargo'?(document.getElementById('m-vencimiento')?.value||''):'';if(!monto){toast('Ingresa un monto','err');return;}const c=cuentas.find(x=>x.id===cuentaId);const nuevo={tipo,monto,desc:desc||(tipo==='cargo'?'Cargo':'Pago'),fecha,vencimiento,id:Date.now()};const movs=[...(c.movimientos||[]),nuevo];try{await fsPatch('cuentas',cuentaId,{clienteId:c.clienteId,clienteNombre:c.clienteNombre,movimientos:movs,fechaCreacion:c.fechaCreacion||''});c.movimientos=movs;toast(tipo==='cargo'?'Cargo registrado!':'Pago registrado!','ok');window.cerrarModal();renderCuentas();setTimeout(()=>window.verCuenta(cuentaId),200);}catch(e){toast('Error al guardar','err');}}
 window.eliminarMov=async function(cuentaId,movId){if(!confirm('Eliminar este movimiento?'))return;const c=cuentas.find(x=>x.id===cuentaId);const movs=(c.movimientos||[]).filter(m=>m.id!==movId);try{await fsPatch('cuentas',cuentaId,{clienteId:c.clienteId,clienteNombre:c.clienteNombre,movimientos:movs,fechaCreacion:c.fechaCreacion||''});c.movimientos=movs;window.cerrarModal();renderCuentas();setTimeout(()=>window.verCuenta(cuentaId),200);}catch(e){toast('Error al eliminar','err');}}
@@ -662,25 +663,26 @@ window.calcularMora = function(cuentaId) {
     const venc = new Date(m.vencimiento);
     return venc < hoy;
   });
-  if (!cargosVencidos.length) {
-    document.getElementById('mora-box').innerHTML = '';
-    return;
-  }
+  const box = document.getElementById('mora-box');
+  if (!box) return;
+  if (!cargosVencidos.length) { box.innerHTML = ''; return; }
   let totalMora = 0;
   let detalle = '';
   for (const m of cargosVencidos) {
     const venc = new Date(m.vencimiento);
     const diasVenc = Math.ceil((hoy - venc) / (1000*60*60*24));
     const mesesVenc = diasVenc / 30;
-    const mora = Math.round(m.monto * TASA_MORA * mesesVenc);
+    const mora = Math.round(m.monto * 0.20 * mesesVenc);
     totalMora += mora;
     detalle += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:0.5px solid #f09595;">'
-      + '<span>' + (m.desc || 'Cargo') + ' · ' + diasVenc + ' dias vencido</span>'
+      + '<span>' + (m.desc || 'Cargo') + ' &middot; ' + diasVenc + ' dias vencido</span>'
       + '<span style="font-weight:500;color:#a32d2d">+' + fmt(mora) + '</span>'
       + '</div>';
   }
-  const box = document.getElementById('mora-box');
-  if (!box) return;
+  const btn = document.createElement('button');
+  btn.textContent = 'Aplicar mora al cliente';
+  btn.style.cssText = 'width:100%;margin-top:10px;padding:9px;font-size:13px;font-weight:500;background:#a32d2d;color:#fff;border:none;border-radius:8px;cursor:pointer;';
+  btn.onclick = function(){ window.aplicarMora(cuentaId, totalMora); };
   box.innerHTML = '<div style="background:#fcebeb;border:0.5px solid #f09595;border-radius:8px;padding:0.75rem 1rem;margin-top:0.5rem;">'
     + '<div style="font-size:13px;font-weight:500;color:#791f1f;margin-bottom:6px;">Mora calculada (20% mensual)</div>'
     + detalle
@@ -688,10 +690,8 @@ window.calcularMora = function(cuentaId) {
     + '<span style="color:#791f1f">Total mora</span>'
     + '<span style="color:#a32d2d">' + fmt(totalMora) + '</span>'
     + '</div>'
-    + '<button onclick="aplicarMora('' + cuentaId + '',' + totalMora + ')" '
-    + 'style="width:100%;margin-top:10px;padding:9px;font-size:13px;font-weight:500;background:#a32d2d;color:#fff;border:none;border-radius:8px;cursor:pointer;">'
-    + 'Aplicar mora al cliente</button>'
     + '</div>';
+  box.querySelector('div').appendChild(btn);
 }
 
 window.aplicarMora = async function(cuentaId, montoMora) {
