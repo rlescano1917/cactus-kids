@@ -84,6 +84,14 @@ textarea{height:60px;resize:vertical}
 .alerta-fiado{background:#fcebeb;border:1px solid #f09595;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:none}
 .alerta-fiado strong{display:block;font-size:14px;color:#791f1f}
 .alerta-fiado span{font-size:13px;color:#a32d2d}
+
+.estado-aldia{background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5;font-size:11px;padding:2px 8px;border-radius:8px;white-space:nowrap}
+.estado-porVencer{background:#faeeda;color:#633806;border:0.5px solid #fac775;font-size:11px;padding:2px 8px;border-radius:8px;white-space:nowrap}
+.estado-vencida{background:#fcebeb;color:#791f1f;border:0.5px solid #f09595;font-size:11px;padding:2px 8px;border-radius:8px;white-space:nowrap;font-weight:500}
+.estado-saldado{background:#f1efe8;color:#5f5e5a;border:0.5px solid #d3d1c7;font-size:11px;padding:2px 8px;border-radius:8px;white-space:nowrap}
+.alerta-vencidas{background:#fcebeb;border:0.5px solid #f09595;border-radius:12px;padding:0.75rem 1rem;margin-bottom:1rem;display:none}
+.alerta-vencidas strong{font-size:14px;color:#791f1f;display:block;margin-bottom:4px}
+.alerta-vencidas span{font-size:13px;color:#a32d2d}
 </style>
 </head>
 <body>
@@ -260,7 +268,18 @@ textarea{height:60px;resize:vertical}
       <span class="contador-badge" id="contador-cc">Cargando...</span>
     </div>
     <div id="sec-lista-cc" class="section active">
+      <div class="alerta-vencidas" id="alerta-vencidas">
+        <strong id="alerta-vencidas-titulo"></strong>
+        <span id="alerta-vencidas-detalle"></span>
+      </div>
       <div class="search-bar"><input type="text" id="buscador-cc" placeholder="Buscar cliente..." oninput="renderCuentas()"></div>
+      <div style="display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap">
+        <button class="badge estado-aldia" style="cursor:pointer;padding:4px 12px" onclick="setFiltroCC('todos',this)" id="fcc-todos">Todas</button>
+        <button class="badge estado-vencida" style="cursor:pointer;padding:4px 12px" onclick="setFiltroCC('vencida',this)" id="fcc-vencida">Vencidas</button>
+        <button class="badge estado-porVencer" style="cursor:pointer;padding:4px 12px" onclick="setFiltroCC('porVencer',this)" id="fcc-porVencer">Por vencer</button>
+        <button class="badge estado-aldia" style="cursor:pointer;padding:4px 12px" onclick="setFiltroCC('aldia',this)" id="fcc-aldia">Al dia</button>
+        <button class="badge estado-saldado" style="cursor:pointer;padding:4px 12px" onclick="setFiltroCC('saldado',this)" id="fcc-saldado">Saldadas</button>
+      </div>
       <div id="lista-cuentas"><div class="empty">Conectando...</div></div>
     </div>
     <div id="sec-nuevo-cc" class="section">
@@ -278,7 +297,13 @@ textarea{height:60px;resize:vertical}
           <div><label>Monto ($)</label><input type="number" id="cc-monto" placeholder="0" min="0"></div>
           <div><label>Descripcion</label><input type="text" id="cc-desc" placeholder="Compra ropa nena..."></div>
         </div>
-        <div class="field-group full"><div><label>Fecha</label><input type="date" id="cc-fecha"></div></div>
+        <div class="field-group">
+          <div><label>Fecha del cargo</label><input type="date" id="cc-fecha"></div>
+          <div><label>Fecha de vencimiento</label><input type="date" id="cc-vencimiento"></div>
+        </div>
+        <div class="field-group full">
+          <div><label>Limite de credito ($) (opcional)</label><input type="number" id="cc-limite" placeholder="Sin limite" min="0"></div>
+        </div>
         <button class="btn-save" onclick="crearCuenta()">Crear cuenta corriente</button>
       </div>
     </div>
@@ -413,14 +438,90 @@ window.eliminarVenta=async function(id){if(!confirm('Eliminar esta venta?'))retu
 function saldo(c){return(c.movimientos||[]).reduce((t,m)=>m.tipo==='cargo'?t+m.monto:t-m.monto,0);}
 window.buscarClienteCC=function(){const q=document.getElementById('buscar-cli-cc').value.toLowerCase().trim();const res=document.getElementById('resultados-cc');if(q.length<2){res.innerHTML='';return;}const yaConCuenta=cuentas.map(c=>c.clienteId);const encontrados=clientes.filter(c=>!yaConCuenta.includes(c.id)&&(c.nombre+' '+c.apellido+' '+(c.dni||'')).toLowerCase().includes(q)).slice(0,5);if(!encontrados.length){res.innerHTML='<div style="font-size:13px;color:#5f5e5a;padding:4px 0;">No encontrado o ya tiene cuenta.</div>';return;}res.innerHTML=encontrados.map(c=>'<div class="res-item" onclick="selCliCC(\''+c.id+'\',\''+c.nombre+' '+c.apellido+'\')"><strong>'+c.nombre+' '+c.apellido+'</strong> <span style="color:#5f5e5a;font-size:12px;">DNI '+(c.dni||'—')+'</span></div>').join('');}
 window.selCliCC=function(id,nombre){cliSelId=id;cliSelNombre=nombre;document.getElementById('buscar-cli-cc').value='';document.getElementById('resultados-cc').innerHTML='';document.getElementById('cli-sel-box').style.display='block';document.getElementById('cli-sel-nombre').textContent=nombre;}
-window.crearCuenta=async function(){if(!cliSelId){toast('Selecciona un cliente primero','err');return;}const monto=parseFloat(document.getElementById('cc-monto').value)||0;const desc=document.getElementById('cc-desc').value.trim();const fecha=document.getElementById('cc-fecha').value||new Date().toISOString().slice(0,10);const movimientos=monto>0?[{tipo:'cargo',monto,desc:desc||'Cargo inicial',fecha,id:Date.now()}]:[];try{const doc=await fsAdd('cuentas',{clienteId:cliSelId,clienteNombre:cliSelNombre,movimientos,fechaCreacion:new Date().toISOString()});cuentas.unshift(doc);cliSelId=null;cliSelNombre='';document.getElementById('buscar-cli-cc').value='';document.getElementById('cli-sel-box').style.display='none';document.getElementById('cc-monto').value='';document.getElementById('cc-desc').value='';document.getElementById('cc-fecha').value='';toast('Cuenta creada!','ok');window.showTabCC('lista');}catch(e){toast('Error al crear cuenta','err');}}
+window.crearCuenta=async function(){if(!cliSelId){toast('Selecciona un cliente primero','err');return;}const monto=parseFloat(document.getElementById('cc-monto').value)||0;const desc=document.getElementById('cc-desc').value.trim();const fecha=document.getElementById('cc-fecha').value||new Date().toISOString().slice(0,10);const movimientos=monto>0?[{tipo:'cargo',monto,desc:desc||'Cargo inicial',fecha,id:Date.now()}]:[];try{
+    const vencimiento=document.getElementById('cc-vencimiento').value||'';
+    const limite=parseFloat(document.getElementById('cc-limite').value)||0;
+    const doc=await fsAdd('cuentas',{clienteId:cliSelId,clienteNombre:cliSelNombre,movimientos,vencimiento,limite,fechaCreacion:new Date().toISOString()});
+    cuentas.unshift(doc);cliSelId=null;cliSelNombre='';
+    document.getElementById('buscar-cli-cc').value='';document.getElementById('cli-sel-box').style.display='none';
+    document.getElementById('cc-monto').value='';document.getElementById('cc-desc').value='';
+    document.getElementById('cc-fecha').value='';document.getElementById('cc-vencimiento').value='';document.getElementById('cc-limite').value='';
+    toast('Cuenta creada!','ok');window.showTabCC('lista');
+  }catch(e){toast('Error al crear cuenta','err');}}
 
-function renderCuentas(){const q=(document.getElementById('buscador-cc').value||'').toLowerCase();const el=document.getElementById('lista-cuentas');const deudores=cuentas.filter(c=>saldo(c)>0).length;document.getElementById('contador-cc').textContent=cuentas.length+' cuenta'+(cuentas.length!==1?'s':'')+' · '+deudores+' con deuda';const f=cuentas.filter(c=>(c.clienteNombre||'').toLowerCase().includes(q));f.sort((a,b)=>saldo(b)-saldo(a));if(!f.length){el.innerHTML='<div class="empty">No hay cuentas. Crea la primera!</div>';return;}el.innerHTML=f.map(c=>{const s=saldo(c);const ini=(c.clienteNombre||'??').split(' ').map(p=>p[0]||'').slice(0,2).join('').toUpperCase();const cls=s>0?'deuda':'saldado';const badge=s>0?'<span class="badge fiado">Debe '+fmt(s)+'</span>':'<span class="badge efectivo">Saldado</span>';return'<div class="venta-row'+(s>0?' con-deuda':'')+'" onclick="verCuenta(\''+c.id+'\')" style="'+(s>0?'border-color:#f09595':'')+'"><div class="avatar" style="'+(s>0?'background:#fcebeb;color:#a32d2d':'background:#e1f5ee;color:#0f6e56')+'">'+ini+'</div><div class="info"><strong>'+c.clienteNombre+'</strong><span>'+(c.movimientos||[]).length+' movimiento'+((c.movimientos||[]).length!==1?'s':'')+'</span></div>'+badge+'</div>';}).join('');}
+function renderCuentas(){
+  const q=(document.getElementById('buscador-cc').value||'').toLowerCase();
+  const el=document.getElementById('lista-cuentas');
+  const deudores=cuentas.filter(c=>saldo(c)>0).length;
+  const vencidas=cuentas.filter(c=>estadoCuenta(c)==='vencida');
+  const porVencer=cuentas.filter(c=>estadoCuenta(c)==='porVencer');
+  const alertaEl=document.getElementById('alerta-vencidas');
+  if(vencidas.length>0){
+    alertaEl.style.display='block';
+    document.getElementById('alerta-vencidas-titulo').textContent=vencidas.length+' cuenta'+(vencidas.length!==1?'s':'')+' vencida'+(vencidas.length!==1?'s':'');
+    const nombres=vencidas.map(c=>c.clienteNombre).join(', ');
+    document.getElementById('alerta-vencidas-detalle').textContent=nombres;
+  }else{alertaEl.style.display='none';}
+  document.getElementById('contador-cc').textContent=cuentas.length+' cuenta'+(cuentas.length!==1?'s':'')+' · '+deudores+' con deuda'+(vencidas.length>0?' · '+vencidas.length+' vencida'+(vencidas.length!==1?'s':''):'');
+  let f=cuentas.filter(c=>(c.clienteNombre||'').toLowerCase().includes(q));
+  if(filtroCCActivo!=='todos') f=f.filter(c=>estadoCuenta(c)===filtroCCActivo);
+  f.sort((a,b)=>{const ord={'vencida':0,'porVencer':1,'aldia':2,'saldado':3};return (ord[estadoCuenta(a)]||2)-(ord[estadoCuenta(b)]||2)||saldo(b)-saldo(a);});if(!f.length){el.innerHTML='<div class="empty">No hay cuentas con ese filtro.</div>';return;}
+  el.innerHTML=f.map(c=>{
+    const s=saldo(c);const est=estadoCuenta(c);
+    const ini=(c.clienteNombre||'??').split(' ').map(p=>p[0]||'').slice(0,2).join('').toUpperCase();
+    const avatarStyle=est==='vencida'?'background:#fcebeb;color:#a32d2d':est==='porVencer'?'background:#faeeda;color:#633806':est==='saldado'?'background:#f1efe8;color:#5f5e5a':'background:#e1f5ee;color:#0f6e56';
+    const rowStyle=est==='vencida'?'border-color:#f09595':est==='porVencer'?'border-color:#fac775':'';
+    const limite=c.limite>0?'<span class="badge" style="font-size:11px">Limite: '+fmt(c.limite)+'</span>':'';
+    return'<div class="venta-row" onclick="verCuenta(\''+c.id+'\''+')" style="'+rowStyle+'"><div class="avatar" style="'+avatarStyle+'">'+ini+'</div><div class="info"><strong>'+c.clienteNombre+'</strong><span>'+(c.movimientos||[]).length+' movimiento'+((c.movimientos||[]).length!==1?'s':'')+(c.vencimiento?' · Vence: '+c.vencimiento:'')+'</span></div><div style="display:flex;gap:4px;align-items:center;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">'+limite+(s>0?'<span style="font-size:14px;font-weight:500;margin-left:4px">'+fmt(s)+'</span>':'')+badgeEstado(c)+'</div></div>';
+  }).join('');}
 
-window.verCuenta=function(id){const c=cuentas.find(x=>x.id===id);if(!c)return;const s=saldo(c);const movs=(c.movimientos||[]).slice().sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));const movsHtml=movs.length?movs.map(m=>'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid #e0dfd8;font-size:13px;"><span style="font-size:11px;padding:2px 8px;border-radius:8px;font-weight:500;flex-shrink:0;'+(m.tipo==='cargo'?'background:#fcebeb;color:#a32d2d':'background:#e1f5ee;color:#085041')+'">'+(m.tipo==='cargo'?'Cargo':'Pago')+'</span><span style="flex:1">'+( m.desc||'—')+'</span><span style="font-size:11px;color:#5f5e5a;white-space:nowrap">'+(m.fecha||'—')+'</span><span style="font-weight:500;'+(m.tipo==='cargo'?'color:#a32d2d':'color:#0f6e56')+'">'+(m.tipo==='cargo'?'+':'-')+fmt(m.monto)+'</span><button style="background:none;border:none;color:#b4b2a9;cursor:pointer;font-size:14px;padding:0 2px" onclick="eliminarMov(\''+id+'\','+m.id+')">x</button></div>').join(''):'<div style="font-size:13px;color:#5f5e5a;padding:0.5rem 0;">Sin movimientos aun.</div>';const m=document.getElementById('modal-content');m.className='modal';m.innerHTML='<h3>'+c.clienteNombre+'</h3><div style="font-size:13px;color:#5f5e5a;margin-bottom:1rem">Cuenta corriente</div>'+'<div style="background:#f1efe8;border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem"><div style="font-size:12px;color:#5f5e5a;margin-bottom:4px">Saldo actual</div><div style="font-size:22px;font-weight:500;'+(s>0?'color:#a32d2d':'color:#0f6e56')+'">'+(s>0?'Debe '+fmt(s):'Saldado')+'</div></div>'+'<div style="font-size:13px;font-weight:500;color:#5f5e5a;margin:1rem 0 0.5rem;border-bottom:0.5px solid #e0dfd8;padding-bottom:4px">Registrar movimiento</div>'+'<div class="field-group" style="margin-bottom:8px;"><div><label>Monto ($)</label><input type="number" id="m-monto" placeholder="0" min="0" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div><div><label>Fecha</label><input type="date" id="m-fecha" value="'+new Date().toISOString().slice(0,10)+'" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div></div>'+'<div style="margin-bottom:10px;"><label style="font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px;">Descripcion</label><input type="text" id="m-desc" placeholder="Detalle..." style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div>'+'<div style="display:flex;gap:8px;margin-bottom:1rem;"><button style="flex:1;padding:8px;font-size:13px;font-weight:500;background:#fcebeb;color:#a32d2d;border:0.5px solid #f09595;border-radius:8px;cursor:pointer" onclick="agregarMov(\''+id+'\',\'cargo\')">+ Cargo</button><button style="flex:1;padding:8px;font-size:13px;font-weight:500;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5;border-radius:8px;cursor:pointer" onclick="agregarMov(\''+id+'\',\'pago\')">+ Pago</button></div>'+'<div style="font-size:13px;font-weight:500;color:#5f5e5a;margin:1rem 0 0.5rem;border-bottom:0.5px solid #e0dfd8;padding-bottom:4px">Historial</div>'+movsHtml+'<button style="width:100%;padding:8px;font-size:13px;border:0.5px solid #b4b2a9;color:#5f5e5a;background:transparent;border-radius:8px;cursor:pointer;margin-top:8px" onclick="cerrarModal()">Cerrar</button>';document.getElementById('modal-bg').classList.add('open');}
+window.verCuenta=function(id){const c=cuentas.find(x=>x.id===id);if(!c)return;const s=saldo(c);const movs=(c.movimientos||[]).slice().sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));const movsHtml=movs.length?movs.map(m=>'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid #e0dfd8;font-size:13px;"><span style="font-size:11px;padding:2px 8px;border-radius:8px;font-weight:500;flex-shrink:0;'+(m.tipo==='cargo'?'background:#fcebeb;color:#a32d2d':'background:#e1f5ee;color:#085041')+'">'+(m.tipo==='cargo'?'Cargo':'Pago')+'</span><span style="flex:1">'+( m.desc||'—')+'</span><span style="font-size:11px;color:#5f5e5a;white-space:nowrap">'+(m.fecha||'—')+'</span><span style="font-weight:500;'+(m.tipo==='cargo'?'color:#a32d2d':'color:#0f6e56')+'">'+(m.tipo==='cargo'?'+':'-')+fmt(m.monto)+'</span><button style="background:none;border:none;color:#b4b2a9;cursor:pointer;font-size:14px;padding:0 2px" onclick="eliminarMov(\''+id+'\','+m.id+')">x</button></div>').join(''):'<div style="font-size:13px;color:#5f5e5a;padding:0.5rem 0;">Sin movimientos aun.</div>';const m=document.getElementById('modal-content');m.className='modal';const est=estadoCuenta(c);const s2=saldo(c);
+  const limiteInfo=c.limite>0?'<div class="modal-field"><span>Limite de credito</span>'+fmt(c.limite)+(s2>c.limite?'<span style="color:#a32d2d;font-size:12px;margin-left:8px">EXCEDIDO</span>':'')+'</div>':'';
+  const vencInfo=c.vencimiento?'<div class="modal-field"><span>Fecha de vencimiento</span>'+c.vencimiento+'</div>':'';
+  const estBadge='<span class="estado-'+est+'" style="margin-bottom:1rem;display:inline-block">'+{saldado:'Saldado',aldia:'Al dia',porVencer:'Por vencer',vencida:'VENCIDA'}[est]+'</span>';
+  m.innerHTML='<h3>'+c.clienteNombre+'</h3>'+estBadge+vencInfo+limiteInfo+'<div style="background:#f1efe8;border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem"><div style="font-size:12px;color:#5f5e5a;margin-bottom:4px">Saldo actual</div><div style="font-size:22px;font-weight:500;'+(s>0?'color:#a32d2d':'color:#0f6e56')+'">'+(s>0?'Debe '+fmt(s):'Saldado')+'</div></div>'+'<div style="font-size:13px;font-weight:500;color:#5f5e5a;margin:1rem 0 0.5rem;border-bottom:0.5px solid #e0dfd8;padding-bottom:4px">Registrar movimiento</div>'+'<div class="field-group" style="margin-bottom:8px;"><div><label>Monto ($)</label><input type="number" id="m-monto" placeholder="0" min="0" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div><div><label>Fecha</label><input type="date" id="m-fecha" value="'+new Date().toISOString().slice(0,10)+'" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div></div>'+'<div style="margin-bottom:10px;"><label style="font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px;">Descripcion</label><input type="text" id="m-desc" placeholder="Detalle..." style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div>'+'<div style="display:flex;gap:8px;margin-bottom:1rem;"><button style="flex:1;padding:8px;font-size:13px;font-weight:500;background:#fcebeb;color:#a32d2d;border:0.5px solid #f09595;border-radius:8px;cursor:pointer" onclick="agregarMov(\''+id+'\',\'cargo\')">+ Cargo</button><button style="flex:1;padding:8px;font-size:13px;font-weight:500;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5;border-radius:8px;cursor:pointer" onclick="agregarMov(\''+id+'\',\'pago\')">+ Pago</button></div>'+'<div style="font-size:13px;font-weight:500;color:#5f5e5a;margin:1rem 0 0.5rem;border-bottom:0.5px solid #e0dfd8;padding-bottom:4px">Historial</div>'+movsHtml+'<button style="width:100%;padding:8px;font-size:13px;border:0.5px solid #b4b2a9;color:#5f5e5a;background:transparent;border-radius:8px;cursor:pointer;margin-top:8px" onclick="cerrarModal()">Cerrar</button>';document.getElementById('modal-bg').classList.add('open');}
 
 window.agregarMov=async function(cuentaId,tipo){const monto=parseFloat(document.getElementById('m-monto').value)||0;const desc=document.getElementById('m-desc').value.trim();const fecha=document.getElementById('m-fecha').value||new Date().toISOString().slice(0,10);if(!monto){toast('Ingresa un monto','err');return;}const c=cuentas.find(x=>x.id===cuentaId);const nuevo={tipo,monto,desc:desc||(tipo==='cargo'?'Cargo':'Pago'),fecha,id:Date.now()};const movs=[...(c.movimientos||[]),nuevo];try{await fsPatch('cuentas',cuentaId,{clienteId:c.clienteId,clienteNombre:c.clienteNombre,movimientos:movs,fechaCreacion:c.fechaCreacion||''});c.movimientos=movs;toast(tipo==='cargo'?'Cargo registrado!':'Pago registrado!','ok');window.cerrarModal();renderCuentas();setTimeout(()=>window.verCuenta(cuentaId),200);}catch(e){toast('Error al guardar','err');}}
 window.eliminarMov=async function(cuentaId,movId){if(!confirm('Eliminar este movimiento?'))return;const c=cuentas.find(x=>x.id===cuentaId);const movs=(c.movimientos||[]).filter(m=>m.id!==movId);try{await fsPatch('cuentas',cuentaId,{clienteId:c.clienteId,clienteNombre:c.clienteNombre,movimientos:movs,fechaCreacion:c.fechaCreacion||''});c.movimientos=movs;window.cerrarModal();renderCuentas();setTimeout(()=>window.verCuenta(cuentaId),200);}catch(e){toast('Error al eliminar','err');}}
+
+
+let filtroCCActivo='todos';
+window.setFiltroCC=function(f,el){filtroCCActivo=f;renderCuentas();}
+
+function estadoCuenta(c){
+  const s=saldo(c);
+  if(s<=0) return 'saldado';
+  const hoy=new Date();hoy.setHours(0,0,0,0);
+  const venc=c.vencimiento?new Date(c.vencimiento):null;
+  if(!venc) return 'aldia';
+  const diff=Math.ceil((venc-hoy)/(1000*60*60*24));
+  if(diff<0) return 'vencida';
+  if(diff<=7) return 'porVencer';
+  return 'aldia';
+}
+
+function diasVencida(c){
+  const hoy=new Date();hoy.setHours(0,0,0,0);
+  const venc=c.vencimiento?new Date(c.vencimiento):null;
+  if(!venc) return 0;
+  return Math.ceil((hoy-venc)/(1000*60*60*24));
+}
+
+function diasParaVencer(c){
+  const hoy=new Date();hoy.setHours(0,0,0,0);
+  const venc=c.vencimiento?new Date(c.vencimiento):null;
+  if(!venc) return 999;
+  return Math.ceil((venc-hoy)/(1000*60*60*24));
+}
+
+function badgeEstado(c){
+  const est=estadoCuenta(c);
+  const s=saldo(c);
+  if(est==='saldado') return '<span class="estado-saldado">Saldado</span>';
+  if(est==='vencida'){const d=diasVencida(c);return '<span class="estado-vencida">Vencida hace '+d+' dia'+(d!==1?'s':'')+'</span>';}
+  if(est==='porVencer'){const d=diasParaVencer(c);return '<span class="estado-porVencer">Vence en '+d+' dia'+(d!==1?'s':'')+'</span>';}
+  return '<span class="estado-aldia">Al dia · Debe '+fmt(s)+'</span>';
+}
 
 window.cerrarModal=function(e){if(!e||e.target===document.getElementById('modal-bg'))document.getElementById('modal-bg').classList.remove('open');}
 document.getElementById('modal-bg').addEventListener('click',window.cerrarModal);
