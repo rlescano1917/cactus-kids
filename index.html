@@ -202,8 +202,28 @@ textarea{height:60px;resize:vertical}
         <div id="productos-container"></div>
         <button class="btn-add" onclick="agregarProducto()">+ Agregar producto</button>
 
+        <div class="section-title">Descuento / Recargo (opcional)</div>
+        <div class="field-group trio">
+          <div><label>Tipo</label>
+            <select id="aj-tipo" onchange="calcTotal()">
+              <option value="ninguno">Ninguno</option>
+              <option value="descuento-pct">Descuento %</option>
+              <option value="descuento-fijo">Descuento $</option>
+              <option value="recargo-pct">Recargo %</option>
+              <option value="recargo-fijo">Recargo $</option>
+            </select>
+          </div>
+          <div><label>Valor</label><input type="number" id="aj-valor" placeholder="0" min="0" oninput="calcTotal()" style="width:100%;font-size:14px;padding:8px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div>
+          <div style="display:flex;flex-direction:column;justify-content:flex-end">
+            <div id="aj-resultado" style="font-size:13px;color:#5f5e5a;padding:8px 0;text-align:center"></div>
+          </div>
+        </div>
+
         <div class="total-box" id="total-box">
-          <span>Total</span>
+          <div>
+            <div style="font-size:12px;color:#888;margin-bottom:2px" id="subtotal-label"></div>
+            <span>Total</span>
+          </div>
           <strong id="total-venta">$0</strong>
         </div>
 
@@ -324,7 +344,23 @@ window.selCliV=function(id,nombre){cliSelVId=id;cliSelVNombre=nombre;document.ge
 
 window.agregarProducto=function(){const id=Date.now();productosTemp.push(id);const c=document.getElementById('productos-container');const d=document.createElement('div');d.className='producto-card';d.id='prod-'+id;d.innerHTML='<button class="rm" onclick="quitarProducto('+id+')">x</button><div class="field-group full" style="margin-bottom:8px"><div><label>Descripcion</label><input type="text" id="p-desc-'+id+'" placeholder="Conjunto nena talleXX" style="width:100%;font-size:14px;padding:6px 8px;border:0.5px solid #d3d1c7;border-radius:8px;"></div></div><div class="field-group trio"><div><label>Talle</label><select id="p-talle-'+id+'" style="width:100%;font-size:14px;padding:6px 8px;border:0.5px solid #d3d1c7;border-radius:8px;"><option value="">--</option>'+['RN','0-3M','3-6M','6-9M','9-12M','12-18M','18-24M','2','3','4','5','6','7','8','10','12','14'].map(t=>'<option>'+t+'</option>').join('')+'</select></div><div><label>Cantidad</label><input type="number" id="p-cant-'+id+'" value="1" min="1" style="width:100%;font-size:14px;padding:6px 8px;border:0.5px solid #d3d1c7;border-radius:8px;" oninput="calcTotal()"></div><div><label>Precio $</label><input type="number" id="p-precio-'+id+'" placeholder="0" min="0" style="width:100%;font-size:14px;padding:6px 8px;border:0.5px solid #d3d1c7;border-radius:8px;" oninput="calcTotal()"></div></div>';c.appendChild(d);}
 window.quitarProducto=function(id){productosTemp=productosTemp.filter(p=>p!==id);document.getElementById('prod-'+id).remove();calcTotal();}
-window.calcTotal=function(){const total=productosTemp.reduce((t,id)=>{const cant=parseFloat(document.getElementById('p-cant-'+id)?.value)||0;const precio=parseFloat(document.getElementById('p-precio-'+id)?.value)||0;return t+(cant*precio);},0);document.getElementById('total-venta').textContent=fmt(total);}
+window.calcTotal=function(){
+  const subtotal=productosTemp.reduce((t,id)=>{const cant=parseFloat(document.getElementById('p-cant-'+id)?.value)||0;const precio=parseFloat(document.getElementById('p-precio-'+id)?.value)||0;return t+(cant*precio);},0);
+  const ajTipo=document.getElementById('aj-tipo')?.value||'ninguno';
+  const ajValor=parseFloat(document.getElementById('aj-valor')?.value)||0;
+  let ajMonto=0,ajLabel='';
+  if(ajTipo==='descuento-pct'&&ajValor>0){ajMonto=-(subtotal*ajValor/100);ajLabel='Descuento '+ajValor+'%: -'+fmt(Math.abs(ajMonto));}
+  else if(ajTipo==='descuento-fijo'&&ajValor>0){ajMonto=-ajValor;ajLabel='Descuento fijo: -'+fmt(ajValor);}
+  else if(ajTipo==='recargo-pct'&&ajValor>0){ajMonto=subtotal*ajValor/100;ajLabel='Recargo '+ajValor+'%: +'+fmt(ajMonto);}
+  else if(ajTipo==='recargo-fijo'&&ajValor>0){ajMonto=ajValor;ajLabel='Recargo fijo: +'+fmt(ajValor);}
+  const total=Math.max(0,subtotal+ajMonto);
+  const res=document.getElementById('aj-resultado');
+  const sublbl=document.getElementById('subtotal-label');
+  if(res)res.textContent=ajLabel;
+  if(sublbl)sublbl.textContent=ajMonto!==0?'Subtotal: '+fmt(subtotal):'';
+  document.getElementById('total-venta').textContent=fmt(total);
+  window._totalCalculado=total;window._ajLabel=ajLabel;
+}
 
 window.selPago=function(tipo){pagoSel=tipo;['efectivo','transferencia','tarjeta','fiado'].forEach(t=>{const b=document.getElementById('pago-'+t);b.className='pago-btn'+(tipo===t?' selected '+t:'');});document.getElementById('alerta-fiado').style.display=tipo==='fiado'?'block':'none';}
 
@@ -333,9 +369,10 @@ window.guardarVenta=async function(){
   if(productosTemp.length===0){toast('Agrega al menos un producto','err');return;}
   if(!pagoSel){toast('Selecciona la forma de pago','err');return;}
   const productos=productosTemp.map(id=>({desc:document.getElementById('p-desc-'+id).value,talle:document.getElementById('p-talle-'+id).value,cantidad:parseFloat(document.getElementById('p-cant-'+id).value)||1,precio:parseFloat(document.getElementById('p-precio-'+id).value)||0}));
-  const total=productos.reduce((t,p)=>t+(p.cantidad*p.precio),0);
+  const total=window._totalCalculado||productos.reduce((t,p)=>t+(p.cantidad*p.precio),0);
+  const ajuste=window._ajLabel||'';
   const fecha=document.getElementById('v-fecha').value||new Date().toISOString().slice(0,10);
-  const venta={clienteId:cliSelVId,clienteNombre:cliSelVNombre,productos,total,formaPago:pagoSel,notas:document.getElementById('v-notas').value,fecha,fechaCreacion:new Date().toISOString()};
+  const venta={clienteId:cliSelVId,clienteNombre:cliSelVNombre,productos,total,ajuste,formaPago:pagoSel,notas:document.getElementById('v-notas').value,fecha,fechaCreacion:new Date().toISOString()};
   try{
     const doc=await fsAdd('ventas',venta);
     ventas.unshift(doc);
@@ -353,7 +390,7 @@ window.guardarVenta=async function(){
     }
     cliSelVId=null;cliSelVNombre='';pagoSel=null;productosTemp=[];
     document.getElementById('buscar-cli-v').value='';document.getElementById('cli-sel-v').style.display='none';
-    document.getElementById('productos-container').innerHTML='';document.getElementById('total-venta').textContent='$0';
+    document.getElementById('productos-container').innerHTML='';document.getElementById('total-venta').textContent='$0';document.getElementById('aj-tipo').selectedIndex=0;document.getElementById('aj-valor').value='';document.getElementById('aj-resultado').textContent='';document.getElementById('subtotal-label').textContent='';window._totalCalculado=0;window._ajLabel='';
     document.getElementById('v-notas').value='';document.getElementById('alerta-fiado').style.display='none';
     ['efectivo','transferencia','tarjeta','fiado'].forEach(t=>document.getElementById('pago-'+t).className='pago-btn');
     toast('Venta registrada!','ok');window.showTabV('lista');
@@ -370,7 +407,7 @@ function renderVentas(){
   if(!f.length){el.innerHTML='<div class="empty">No hay ventas. Registra la primera!</div>';return;}
   el.innerHTML=f.map(v=>{const ini=(v.clienteNombre||'??').split(' ').map(p=>p[0]||'').slice(0,2).join('').toUpperCase();const badgePago='<span class="badge '+(v.formaPago||'efectivo')+'">'+(v.formaPago||'efectivo')+'</span>';const nProd=v.productos?v.productos.length:0;return'<div class="venta-row" onclick="verVenta(\''+v.id+'\')"><div class="avatar">'+ini+'</div><div class="info"><strong>'+v.clienteNombre+'</strong><span>'+v.fecha+' · '+nProd+' producto'+(nProd!==1?'s':'')+'</span></div><div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">'+badgePago+'<span style="font-size:15px;font-weight:500">'+fmt(v.total)+'</span></div></div>';}).join('');}
 
-window.verVenta=function(id){const v=ventas.find(x=>x.id===id);if(!v)return;const prods=v.productos&&v.productos.length?v.productos.map(p=>'<div style="background:#f1efe8;border-radius:8px;padding:8px;margin-bottom:6px;font-size:13px;display:flex;justify-content:space-between;"><span>'+(p.desc||'—')+(p.talle?' · '+p.talle:'')+' x'+(p.cantidad||1)+'</span><span style="font-weight:500">'+fmt((p.precio||0)*(p.cantidad||1))+'</span></div>').join(''):'<span style="font-size:13px;color:#5f5e5a;">Sin detalle</span>';const m=document.getElementById('modal-content');m.className='modal';m.innerHTML='<h3>Venta a '+v.clienteNombre+'</h3>'+'<div class="modal-field"><span>Fecha</span>'+val(v.fecha)+'</div>'+'<div class="modal-field"><span>Forma de pago</span>'+(v.formaPago||'—')+'</div>'+'<div class="modal-field"><span>Productos</span>'+prods+'</div>'+'<div style="background:#1a1a18;border-radius:8px;padding:0.75rem 1rem;margin:0.75rem 0;display:flex;justify-content:space-between;align-items:center"><span style="color:#f1efe8;font-size:14px">Total</span><span style="color:#fff;font-size:18px;font-weight:500">'+fmt(v.total)+'</span></div>'+'<div class="modal-field"><span>Notas</span>'+val(v.notas)+'</div>'+'<div class="modal-actions"><button class="btn-delete" onclick="eliminarVenta(\''+v.id+'\')">Eliminar</button><button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>';document.getElementById('modal-bg').classList.add('open');}
+window.verVenta=function(id){const v=ventas.find(x=>x.id===id);if(!v)return;const prods=v.productos&&v.productos.length?v.productos.map(p=>'<div style="background:#f1efe8;border-radius:8px;padding:8px;margin-bottom:6px;font-size:13px;display:flex;justify-content:space-between;"><span>'+(p.desc||'—')+(p.talle?' · '+p.talle:'')+' x'+(p.cantidad||1)+'</span><span style="font-weight:500">'+fmt((p.precio||0)*(p.cantidad||1))+'</span></div>').join(''):'<span style="font-size:13px;color:#5f5e5a;">Sin detalle</span>';const m=document.getElementById('modal-content');m.className='modal';m.innerHTML='<h3>Venta a '+v.clienteNombre+'</h3>'+'<div class="modal-field"><span>Fecha</span>'+val(v.fecha)+'</div>'+'<div class="modal-field"><span>Forma de pago</span>'+(v.formaPago||'—')+'</div>'+'<div class="modal-field"><span>Ajuste</span>'+(v.ajuste||'Sin ajuste')+'</div>'+'<div class="modal-field"><span>Productos</span>'+prods+'</div>'+'<div style="background:#1a1a18;border-radius:8px;padding:0.75rem 1rem;margin:0.75rem 0;display:flex;justify-content:space-between;align-items:center"><span style="color:#f1efe8;font-size:14px">Total</span><span style="color:#fff;font-size:18px;font-weight:500">'+fmt(v.total)+'</span></div>'+'<div class="modal-field"><span>Notas</span>'+val(v.notas)+'</div>'+'<div class="modal-actions"><button class="btn-delete" onclick="eliminarVenta(\''+v.id+'\')">Eliminar</button><button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>';document.getElementById('modal-bg').classList.add('open');}
 window.eliminarVenta=async function(id){if(!confirm('Eliminar esta venta?'))return;try{await fsDel('ventas',id);ventas=ventas.filter(v=>v.id!==id);window.cerrarModal();renderVentas();toast('Venta eliminada','ok');}catch(e){toast('Error al eliminar','err');}}
 
 function saldo(c){return(c.movimientos||[]).reduce((t,m)=>m.tipo==='cargo'?t+m.monto:t-m.monto,0);}
