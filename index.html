@@ -158,8 +158,16 @@ textarea{height:60px;resize:vertical}
           <div><label>DNI *</label><input id="f-dni" type="text" placeholder="12345678" oninput="verificarDni()" maxlength="8"><div class="toast" style="position:static;display:none;transform:none;margin-top:4px;padding:4px 8px;font-size:12px;border-radius:6px" id="dni-alerta">Ya existe</div></div>
           <div><label>Fecha de nac.</label><input id="f-fnac" type="date"></div>
         </div>
-        <div class="field-group">
-          <div><label>Telefono</label><input id="f-tel" type="tel" placeholder="381 123 4567"></div>
+        <div class="field-group full">
+          <div>
+            <label>WhatsApp principal * <span style="font-size:11px;color:#0f6e56;background:#e1f5ee;padding:2px 6px;border-radius:6px;">Obligatorio</span></label>
+            <input id="f-tel" type="tel" placeholder="3811234567 (sin espacios ni guiones)">
+            <div style="font-size:11px;color:#5f5e5a;margin-top:3px;">Solo numeros, sin el 0 ni el 15. Ej: 3811234567</div>
+          </div>
+        </div>
+        <div id="tel-secundario-container"></div>
+        <button class="btn-add" onclick="agregarTelSecundario()" id="btn-add-tel" style="margin-bottom:12px;">+ Agregar numero secundario</button>
+        <div class="field-group full">
           <div><label>Email</label><input id="f-email" type="email" placeholder="maria@gmail.com"></div>
         </div>
         <div class="field-group">
@@ -382,11 +390,57 @@ window.agregarHijo=function(containerId,datos){const id=Date.now()+Math.floor(Ma
 window.quitarHijo=function(id,containerId){if(containerId==='hijos-container')hijosTemp=hijosTemp.filter(h=>h!==id);else editHijosTemp=editHijosTemp.filter(h=>h!==id);document.getElementById('hijo-'+id).remove();}
 function getHijos(arr){return arr.map(id=>({nombre:document.getElementById('h-nombre-'+id).value,fechaNac:document.getElementById('h-fecha-'+id).value,talle:document.getElementById('h-talle-'+id).value,genero:document.getElementById('h-genero-'+id).value}));}
 
-window.guardarCliente=async function(){const nombre=document.getElementById('f-nombre').value.trim();const apellido=document.getElementById('f-apellido').value.trim();const dni=document.getElementById('f-dni').value.trim();if(!nombre||!apellido){toast('Completa nombre y apellido','err');return;}if(!dni){toast('El DNI es obligatorio','err');return;}if(clientes.find(c=>c.dni===dni)){toast('Ya existe un cliente con ese DNI','err');return;}const c={nombre,apellido,dni,fnac:document.getElementById('f-fnac').value,tel:document.getElementById('f-tel').value,email:document.getElementById('f-email').value,ciudad:document.getElementById('f-ciudad').value,tipo:document.getElementById('f-tipo').value,notas:document.getElementById('f-notas').value,hijos:getHijos(hijosTemp),fechaAlta:new Date().toISOString()};try{const doc=await fsAdd('clientes',c);clientes.unshift(doc);['f-nombre','f-apellido','f-dni','f-fnac','f-tel','f-email','f-ciudad','f-notas'].forEach(id=>document.getElementById(id).value='');document.getElementById('f-tipo').selectedIndex=0;document.getElementById('hijos-container').innerHTML='';hijosTemp=[];toast('Cliente guardado!','ok');window.showTab('lista');}catch(e){toast('Error al guardar','err');}}
+
+window.agregarTelSecundario = function(){
+  const cont = document.getElementById('tel-secundario-container');
+  if(cont.querySelector('.tel-sec')) return; // solo uno por ahora
+  const div = document.createElement('div');
+  div.className = 'tel-sec';
+  div.style.cssText = 'background:#f1efe8;border-radius:8px;padding:0.75rem;margin-bottom:8px;position:relative;';
+  div.innerHTML = '<button onclick="this.parentElement.remove()" style="position:absolute;top:8px;right:8px;background:none;border:none;color:#5f5e5a;cursor:pointer;font-size:16px;">x</button>'
+    + '<div class="field-group" style="margin-bottom:0">'
+    + '<div><label>Numero secundario</label><input type="tel" id="f-tel2" placeholder="3814567890" style="width:100%;font-size:14px;padding:8px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div>'
+    + '<div><label>Descripcion</label><input type="text" id="f-tel2-desc" placeholder="Ej: marido, mama..." style="width:100%;font-size:14px;padding:8px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div>'
+    + '</div>';
+  cont.appendChild(div);
+  document.getElementById('btn-add-tel').style.display='none';
+}
+
+function limpiarTel(tel){
+  return tel.replace(/[^0-9]/g,'');
+}
+
+function abrirWhatsApp(tel, nombre){
+  const num = '549' + limpiarTel(tel);
+  const msg = encodeURIComponent('Hola ' + nombre + '! Te registramos como cliente de Cactus Kids. Cualquier consulta estamos a tu disposicion!');
+  window.open('https://wa.me/' + num + '?text=' + msg, '_blank');
+}
+
+window.guardarCliente=async function(){
+  const nombre=document.getElementById('f-nombre').value.trim();
+  const apellido=document.getElementById('f-apellido').value.trim();
+  const dni=document.getElementById('f-dni').value.trim();
+  const tel=limpiarTel(document.getElementById('f-tel').value);
+  if(!nombre||!apellido){toast('Completa nombre y apellido','err');return;}
+  if(!dni){toast('El DNI es obligatorio','err');return;}
+  if(!tel||tel.length<8){toast('El WhatsApp es obligatorio','err');return;}
+  if(clientes.find(c=>c.dni===dni)){toast('Ya existe un cliente con ese DNI','err');return;}
+  const tel2El=document.getElementById('f-tel2');
+  const tel2DescEl=document.getElementById('f-tel2-desc');
+  const tel2=tel2El?limpiarTel(tel2El.value):'';
+  const tel2Desc=tel2DescEl?tel2DescEl.value.trim():'';
+  const c={nombre,apellido,dni,fnac:document.getElementById('f-fnac').value,tel,tel2,tel2Desc,email:document.getElementById('f-email').value,ciudad:document.getElementById('f-ciudad').value,tipo:document.getElementById('f-tipo').value,notas:document.getElementById('f-notas').value,hijos:getHijos(hijosTemp),fechaAlta:new Date().toISOString()};try{const doc=await fsAdd('clientes',c);clientes.unshift(doc);['f-nombre','f-apellido','f-dni','f-fnac','f-tel','f-email','f-ciudad','f-notas'].forEach(id=>document.getElementById(id).value='');document.getElementById('f-tipo').selectedIndex=0;document.getElementById('hijos-container').innerHTML='';document.getElementById('tel-secundario-container').innerHTML='';document.getElementById('btn-add-tel').style.display='';hijosTemp=[];toast('Cliente guardado!','ok');window.showTab('lista');}catch(e){toast('Error al guardar','err');}}
 
 function renderLista(){const q=(document.getElementById('buscador').value||'').toLowerCase();document.getElementById('contador').textContent=clientes.length+' cliente'+(clientes.length!==1?'s':'');let f=clientes.filter(c=>(c.nombre+' '+c.apellido+' '+(c.dni||'')+' '+(c.tel||'')).toLowerCase().includes(q));if(filtroActivo!=='todos')f=f.filter(c=>c.tipo===filtroActivo);f.sort((a,b)=>(a.tipo==='critico'?0:1)-(b.tipo==='critico'?0:1));const el=document.getElementById('lista-clientes');if(!f.length){el.innerHTML='<div class="empty">No hay clientes. Agrega el primero!</div>';return;}el.innerHTML=f.map(c=>{const ini=(c.nombre[0]||'')+(c.apellido[0]||'');const cr=c.tipo==='critico';const hj=c.hijos&&c.hijos.length?'<span class="badge">'+c.hijos.length+' hijo'+(c.hijos.length>1?'s':'')+'</span>':'';const tp=cr?'<span class="badge fiado">Sin credito</span>':c.tipo==='vip'?'<span class="badge tarjeta">VIP</span>':'';return'<div class="venta-row'+(cr?' critico':'')+'" onclick="verCliente(\''+c.id+'\')" style="'+(cr?'border-color:#f09595;background:#fcebeb':'')+'"><div class="avatar" style="'+(cr?'background:#fcebeb;color:#a32d2d':'')+'">'+ini.toUpperCase()+'</div><div class="info"><strong>'+c.nombre+' '+c.apellido+'</strong><span>DNI '+(c.dni||'—')+' · '+(c.tel||'Sin tel')+'</span></div><div style="display:flex;gap:4px;flex-shrink:0;">'+hj+tp+'</div></div>';}).join('');}
 
-window.verCliente=function(id){const c=clientes.find(x=>x.id===id);if(!c)return;const cr=c.tipo==='critico';const hj=c.hijos&&c.hijos.length?c.hijos.map(h=>'<div style="background:#f1efe8;border-radius:8px;padding:8px;margin-bottom:6px;font-size:13px;"><strong>'+(h.nombre||'Sin nombre')+'</strong><br>'+(h.fechaNac?'Nac: '+h.fechaNac+' · ':'')+( h.talle?'Talle: '+h.talle:'')+(h.genero?' · '+h.genero:'')+'</div>').join(''):'<span style="color:#5f5e5a;font-size:13px;">Sin hijos registrados</span>';const al=cr?'<div style="background:#fcebeb;border-radius:8px;padding:10px 14px;margin-bottom:1rem"><strong style="color:#791f1f;display:block">No otorgar credito ni fiado</strong><span style="font-size:13px;color:#a32d2d">Cliente critico.</span></div>':'';const m=document.getElementById('modal-content');m.className='modal';m.innerHTML=al+'<h3>'+c.nombre+' '+c.apellido+'</h3>'+'<div class="modal-field"><span>DNI</span>'+val(c.dni)+'</div>'+'<div class="modal-field"><span>Telefono</span>'+val(c.tel)+'</div>'+'<div class="modal-field"><span>Ciudad</span>'+val(c.ciudad)+'</div>'+'<div class="modal-field"><span>Tipo</span>'+(c.tipo||'regular')+'</div>'+'<div class="modal-field"><span>Hijos</span>'+hj+'</div>'+'<div class="modal-field"><span>Notas</span>'+val(c.notas)+'</div>'+'<div class="modal-actions"><button class="btn-delete" onclick="eliminarCliente(\''+c.id+'\')">Eliminar</button><button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>';document.getElementById('modal-bg').classList.add('open');}
+window.verCliente=function(id){const c=clientes.find(x=>x.id===id);if(!c)return;const cr=c.tipo==='critico';const hj=c.hijos&&c.hijos.length?c.hijos.map(h=>'<div style="background:#f1efe8;border-radius:8px;padding:8px;margin-bottom:6px;font-size:13px;"><strong>'+(h.nombre||'Sin nombre')+'</strong><br>'+(h.fechaNac?'Nac: '+h.fechaNac+' · ':'')+( h.talle?'Talle: '+h.talle:'')+(h.genero?' · '+h.genero:'')+'</div>').join(''):'<span style="color:#5f5e5a;font-size:13px;">Sin hijos registrados</span>';const tel=c.tel||'';
+  const tel2=c.tel2||'';
+  const tel2Desc=c.tel2Desc||'';
+  const waBtn=tel?'<button onclick="abrirWhatsApp(\''+tel+'\',\''+c.nombre+'\')" style="font-size:12px;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5;border-radius:6px;padding:3px 10px;cursor:pointer;margin-left:8px;">Enviar WA</button>':'';
+  const wa2Btn=tel2?'<button onclick="abrirWhatsApp(\''+tel2+'\',\''+c.nombre+'\')" style="font-size:12px;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5;border-radius:6px;padding:3px 10px;cursor:pointer;margin-left:8px;">Enviar WA</button>':'';
+  const al=cr?'<div style="background:#fcebeb;border-radius:8px;padding:10px 14px;margin-bottom:1rem"><strong style="color:#791f1f;display:block">No otorgar credito ni fiado</strong><span style="font-size:13px;color:#a32d2d">Cliente critico.</span></div>':'';const m=document.getElementById('modal-content');m.className='modal';m.innerHTML=al+'<h3>'+c.nombre+' '+c.apellido+'</h3>'+'<div class="modal-field"><span>DNI</span>'+val(c.dni)+'</div>'
+    +'<div class="modal-field"><span>WhatsApp principal</span><div style="display:flex;align-items:center;">'+(tel||'—')+waBtn+'</div></div>'
+    +(tel2?'<div class="modal-field"><span>WA secundario'+(tel2Desc?' ('+tel2Desc+')':'')+'</span><div style="display:flex;align-items:center;">'+tel2+wa2Btn+'</div></div>':'')+'<div class="modal-field"><span>Telefono</span>'+val(c.tel)+'</div>'+'<div class="modal-field"><span>Ciudad</span>'+val(c.ciudad)+'</div>'+'<div class="modal-field"><span>Tipo</span>'+(c.tipo||'regular')+'</div>'+'<div class="modal-field"><span>Hijos</span>'+hj+'</div>'+'<div class="modal-field"><span>Notas</span>'+val(c.notas)+'</div>'+'<div class="modal-actions"><button class="btn-delete" onclick="eliminarCliente(\''+c.id+'\')">Eliminar</button><button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>';document.getElementById('modal-bg').classList.add('open');}
 window.eliminarCliente=async function(id){if(!confirm('Eliminar este cliente?'))return;try{await fsDel('clientes',id);clientes=clientes.filter(c=>c.id!==id);window.cerrarModal();renderLista();toast('Cliente eliminado','ok');}catch(e){toast('Error al eliminar','err');}}
 
 window.buscarClienteV=function(){const q=document.getElementById('buscar-cli-v').value.toLowerCase().trim();const res=document.getElementById('resultados-v');if(q.length<2){res.innerHTML='';return;}const encontrados=clientes.filter(c=>(c.nombre+' '+c.apellido+' '+(c.dni||'')).toLowerCase().includes(q)).slice(0,5);if(!encontrados.length){res.innerHTML='<div style="font-size:13px;color:#5f5e5a;padding:4px 0;">No encontrado.</div>';return;}res.innerHTML=encontrados.map(c=>'<div class="res-item" onclick="selCliV(\''+c.id+'\',\''+c.nombre+' '+c.apellido+'\')"><strong>'+c.nombre+' '+c.apellido+'</strong> <span style="color:#5f5e5a;font-size:12px;">DNI '+(c.dni||'—')+'</span></div>').join('');}
