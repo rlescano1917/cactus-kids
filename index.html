@@ -476,43 +476,91 @@ function renderCuentas(){
     return'<div class="venta-row" onclick="verCuenta(\''+c.id+'\''+')" style="'+rowStyle+'"><div class="avatar" style="'+avatarStyle+'">'+ini+'</div><div class="info"><strong>'+c.clienteNombre+'</strong><span>'+(c.movimientos||[]).length+' movimiento'+((c.movimientos||[]).length!==1?'s':'')+(c.vencimiento?' · Vence: '+c.vencimiento:'')+'</span></div><div style="display:flex;gap:4px;align-items:center;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">'+limite+(s>0?'<span style="font-size:14px;font-weight:500;margin-left:4px">'+fmt(s)+'</span>':'')+badgeEstado(c)+'</div></div>';
   }).join('');}
 
-window.verCuenta=function(id){const c=cuentas.find(x=>x.id===id);if(!c)return;const s=saldo(c);const movs=(c.movimientos||[]).slice().sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));const movsHtml=movs.length?movs.map(m=>'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid #e0dfd8;font-size:13px;"><span style="font-size:11px;padding:2px 8px;border-radius:8px;font-weight:500;flex-shrink:0;'+(m.tipo==='cargo'?'background:#fcebeb;color:#a32d2d':'background:#e1f5ee;color:#085041')+'">'+(m.tipo==='cargo'?'Cargo':'Pago')+'</span><span style="flex:1">'+( m.desc||'—')+'</span><span style="font-size:11px;color:#5f5e5a;white-space:nowrap">'+(m.fecha||'—')+'</span><span style="font-weight:500;'+(m.tipo==='cargo'?'color:#a32d2d':'color:#0f6e56')+'">'+(m.tipo==='cargo'?'+':'-')+fmt(m.monto)+'</span><button style="background:none;border:none;color:#b4b2a9;cursor:pointer;font-size:14px;padding:0 2px" onclick="eliminarMov(\''+id+'\','+m.id+')">x</button></div>').join(''):'<div style="font-size:13px;color:#5f5e5a;padding:0.5rem 0;">Sin movimientos aun.</div>';const m=document.getElementById('modal-content');m.className='modal';const est=estadoCuenta(c);const s2=saldo(c);
+window.verCuenta=function(id){const c=cuentas.find(x=>x.id===id);if(!c)return;const s=saldo(c);const movs=(c.movimientos||[]).slice().sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));const movsHtml=movs.length?movs.map(m=>{
+    const hoy=new Date();hoy.setHours(0,0,0,0);
+    let vencBadge='';
+    if(m.tipo==='cargo'&&m.vencimiento){
+      const venc=new Date(m.vencimiento);
+      const diff=Math.ceil((venc-hoy)/(1000*60*60*24));
+      if(diff<0) vencBadge='<span style="font-size:10px;background:#fcebeb;color:#a32d2d;border-radius:6px;padding:1px 6px;margin-left:4px">Vencio hace '+Math.abs(diff)+'d</span>';
+      else if(diff<=7) vencBadge='<span style="font-size:10px;background:#faeeda;color:#633806;border-radius:6px;padding:1px 6px;margin-left:4px">Vence en '+diff+'d</span>';
+      else vencBadge='<span style="font-size:10px;background:#e1f5ee;color:#085041;border-radius:6px;padding:1px 6px;margin-left:4px">Vence '+m.vencimiento+'</span>';
+    }
+    return '<div style="padding:8px 0;border-bottom:0.5px solid #e0dfd8;font-size:13px;">'
+      +'<div style="display:flex;align-items:center;gap:8px;">'
+      +'<span style="font-size:11px;padding:2px 8px;border-radius:8px;font-weight:500;flex-shrink:0;'+(m.tipo==='cargo'?'background:#fcebeb;color:#a32d2d':'background:#e1f5ee;color:#085041')+'">'+(m.tipo==='cargo'?'Cargo':'Pago')+'</span>'
+      +'<span style="flex:1">'+(m.desc||'—')+'</span>'
+      +'<span style="font-weight:500;'+(m.tipo==='cargo'?'color:#a32d2d':'color:#0f6e56')+'">'+(m.tipo==='cargo'?'+':'-')+fmt(m.monto)+'</span>'
+      +'<button style="background:none;border:none;color:#b4b2a9;cursor:pointer;font-size:14px;padding:0 2px" onclick="eliminarMov(\''+id+'\','+m.id+')">x</button>'
+      +'</div>'
+      +'<div style="font-size:11px;color:#5f5e5a;margin-top:2px;margin-left:4px">'+m.fecha+(vencBadge?vencBadge:'')+'</div>'
+      +'</div>';
+  }).join(''):'<div style="font-size:13px;color:#5f5e5a;padding:0.5rem 0;">Sin movimientos aun.</div>';
+const m=document.getElementById('modal-content');m.className='modal';const est=estadoCuenta(c);const s2=saldo(c);
   const limiteInfo=c.limite>0?'<div class="modal-field"><span>Limite de credito</span>'+fmt(c.limite)+(s2>c.limite?'<span style="color:#a32d2d;font-size:12px;margin-left:8px">EXCEDIDO</span>':'')+'</div>':'';
   const vencInfo=c.vencimiento?'<div class="modal-field"><span>Fecha de vencimiento</span>'+c.vencimiento+'</div>':'';
   const estBadge='<span class="estado-'+est+'" style="margin-bottom:1rem;display:inline-block">'+{saldado:'Saldado',aldia:'Al dia',porVencer:'Por vencer',vencida:'VENCIDA'}[est]+'</span>';
-  m.innerHTML='<h3>'+c.clienteNombre+'</h3>'+estBadge+vencInfo+limiteInfo+'<div style="background:#f1efe8;border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem"><div style="font-size:12px;color:#5f5e5a;margin-bottom:4px">Saldo actual</div><div style="font-size:22px;font-weight:500;'+(s>0?'color:#a32d2d':'color:#0f6e56')+'">'+(s>0?'Debe '+fmt(s):'Saldado')+'</div></div>'+'<div style="font-size:13px;font-weight:500;color:#5f5e5a;margin:1rem 0 0.5rem;border-bottom:0.5px solid #e0dfd8;padding-bottom:4px">Registrar movimiento</div>'+'<div class="field-group" style="margin-bottom:8px;"><div><label>Monto ($)</label><input type="number" id="m-monto" placeholder="0" min="0" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div><div><label>Fecha</label><input type="date" id="m-fecha" value="'+new Date().toISOString().slice(0,10)+'" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div></div>'+'<div style="margin-bottom:10px;"><label style="font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px;">Descripcion</label><input type="text" id="m-desc" placeholder="Detalle..." style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div>'+'<div style="display:flex;gap:8px;margin-bottom:1rem;"><button style="flex:1;padding:8px;font-size:13px;font-weight:500;background:#fcebeb;color:#a32d2d;border:0.5px solid #f09595;border-radius:8px;cursor:pointer" onclick="agregarMov(\''+id+'\',\'cargo\')">+ Cargo</button><button style="flex:1;padding:8px;font-size:13px;font-weight:500;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5;border-radius:8px;cursor:pointer" onclick="agregarMov(\''+id+'\',\'pago\')">+ Pago</button></div>'+'<div style="font-size:13px;font-weight:500;color:#5f5e5a;margin:1rem 0 0.5rem;border-bottom:0.5px solid #e0dfd8;padding-bottom:4px">Historial</div>'+movsHtml+'<button style="width:100%;padding:8px;font-size:13px;border:0.5px solid #b4b2a9;color:#5f5e5a;background:transparent;border-radius:8px;cursor:pointer;margin-top:8px" onclick="cerrarModal()">Cerrar</button>';document.getElementById('modal-bg').classList.add('open');}
+  m.innerHTML='<h3>'+c.clienteNombre+'</h3>'+estBadge+vencInfo+limiteInfo+'<div style="background:#f1efe8;border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem"><div style="font-size:12px;color:#5f5e5a;margin-bottom:4px">Saldo actual</div><div style="font-size:22px;font-weight:500;'+(s>0?'color:#a32d2d':'color:#0f6e56')+'">'+(s>0?'Debe '+fmt(s):'Saldado')+'</div></div>'+'<div style="font-size:13px;font-weight:500;color:#5f5e5a;margin:1rem 0 0.5rem;border-bottom:0.5px solid #e0dfd8;padding-bottom:4px">Registrar movimiento</div>'+'<div class="field-group" style="margin-bottom:8px;"><div><label>Monto ($)</label><input type="number" id="m-monto" placeholder="0" min="0" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div><div><label>Fecha del cargo</label><input type="date" id="m-fecha" value="'+new Date().toISOString().slice(0,10)+'" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div></div>'+'<div style="margin-bottom:10px;"><label style="font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px;">Fecha de vencimiento (solo para cargos)</label><input type="date" id="m-vencimiento" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div>'+'<div style="margin-bottom:10px;"><label style="font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px;">Descripcion</label><input type="text" id="m-desc" placeholder="Detalle..." style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px;"></div>'+'<div style="display:flex;gap:8px;margin-bottom:1rem;"><button style="flex:1;padding:8px;font-size:13px;font-weight:500;background:#fcebeb;color:#a32d2d;border:0.5px solid #f09595;border-radius:8px;cursor:pointer" onclick="agregarMov(\''+id+'\',\'cargo\')">+ Cargo</button><button style="flex:1;padding:8px;font-size:13px;font-weight:500;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5;border-radius:8px;cursor:pointer" onclick="agregarMov(\''+id+'\',\'pago\')">+ Pago</button></div>'+'<div style="font-size:13px;font-weight:500;color:#5f5e5a;margin:1rem 0 0.5rem;border-bottom:0.5px solid #e0dfd8;padding-bottom:4px">Historial</div>'+movsHtml+'<button style="width:100%;padding:8px;font-size:13px;border:0.5px solid #b4b2a9;color:#5f5e5a;background:transparent;border-radius:8px;cursor:pointer;margin-top:8px" onclick="cerrarModal()">Cerrar</button>';document.getElementById('modal-bg').classList.add('open');}
 
-window.agregarMov=async function(cuentaId,tipo){const monto=parseFloat(document.getElementById('m-monto').value)||0;const desc=document.getElementById('m-desc').value.trim();const fecha=document.getElementById('m-fecha').value||new Date().toISOString().slice(0,10);if(!monto){toast('Ingresa un monto','err');return;}const c=cuentas.find(x=>x.id===cuentaId);const nuevo={tipo,monto,desc:desc||(tipo==='cargo'?'Cargo':'Pago'),fecha,id:Date.now()};const movs=[...(c.movimientos||[]),nuevo];try{await fsPatch('cuentas',cuentaId,{clienteId:c.clienteId,clienteNombre:c.clienteNombre,movimientos:movs,fechaCreacion:c.fechaCreacion||''});c.movimientos=movs;toast(tipo==='cargo'?'Cargo registrado!':'Pago registrado!','ok');window.cerrarModal();renderCuentas();setTimeout(()=>window.verCuenta(cuentaId),200);}catch(e){toast('Error al guardar','err');}}
+window.agregarMov=async function(cuentaId,tipo){const monto=parseFloat(document.getElementById('m-monto').value)||0;const desc=document.getElementById('m-desc').value.trim();const fecha=document.getElementById('m-fecha').value||new Date().toISOString().slice(0,10);const vencimiento=tipo==='cargo'?(document.getElementById('m-vencimiento')?.value||''):'';if(!monto){toast('Ingresa un monto','err');return;}const c=cuentas.find(x=>x.id===cuentaId);const nuevo={tipo,monto,desc:desc||(tipo==='cargo'?'Cargo':'Pago'),fecha,vencimiento,id:Date.now()};const movs=[...(c.movimientos||[]),nuevo];try{await fsPatch('cuentas',cuentaId,{clienteId:c.clienteId,clienteNombre:c.clienteNombre,movimientos:movs,fechaCreacion:c.fechaCreacion||''});c.movimientos=movs;toast(tipo==='cargo'?'Cargo registrado!':'Pago registrado!','ok');window.cerrarModal();renderCuentas();setTimeout(()=>window.verCuenta(cuentaId),200);}catch(e){toast('Error al guardar','err');}}
 window.eliminarMov=async function(cuentaId,movId){if(!confirm('Eliminar este movimiento?'))return;const c=cuentas.find(x=>x.id===cuentaId);const movs=(c.movimientos||[]).filter(m=>m.id!==movId);try{await fsPatch('cuentas',cuentaId,{clienteId:c.clienteId,clienteNombre:c.clienteNombre,movimientos:movs,fechaCreacion:c.fechaCreacion||''});c.movimientos=movs;window.cerrarModal();renderCuentas();setTimeout(()=>window.verCuenta(cuentaId),200);}catch(e){toast('Error al eliminar','err');}}
 
 
 let filtroCCActivo='todos';
 window.setFiltroCC=function(f,el){filtroCCActivo=f;renderCuentas();}
 
-function estadoCuenta(c){
-  const s=saldo(c);
-  if(s<=0) return 'saldado';
+function estadoCargo(m, pagosRestantes){
+  if(m.tipo!=='cargo') return null;
   const hoy=new Date();hoy.setHours(0,0,0,0);
-  const venc=c.vencimiento?new Date(c.vencimiento):null;
-  if(!venc) return 'aldia';
+  if(!m.vencimiento) return 'sinFecha';
+  const venc=new Date(m.vencimiento);
   const diff=Math.ceil((venc-hoy)/(1000*60*60*24));
   if(diff<0) return 'vencida';
   if(diff<=7) return 'porVencer';
   return 'aldia';
 }
 
+function estadoCuenta(c){
+  const s=saldo(c);
+  if(s<=0) return 'saldado';
+  const hoy=new Date();hoy.setHours(0,0,0,0);
+  const cargos=(c.movimientos||[]).filter(m=>m.tipo==='cargo'&&m.vencimiento);
+  if(!cargos.length) return 'aldia';
+  let minDiff=999;
+  for(const m of cargos){
+    const venc=new Date(m.vencimiento);
+    const diff=Math.ceil((venc-hoy)/(1000*60*60*24));
+    if(diff<minDiff) minDiff=diff;
+  }
+  if(minDiff<0) return 'vencida';
+  if(minDiff<=7) return 'porVencer';
+  return 'aldia';
+}
+
 function diasVencida(c){
   const hoy=new Date();hoy.setHours(0,0,0,0);
-  const venc=c.vencimiento?new Date(c.vencimiento):null;
-  if(!venc) return 0;
-  return Math.ceil((hoy-venc)/(1000*60*60*24));
+  const cargos=(c.movimientos||[]).filter(m=>m.tipo==='cargo'&&m.vencimiento);
+  if(!cargos.length) return 0;
+  let maxDias=0;
+  for(const m of cargos){
+    const venc=new Date(m.vencimiento);
+    const diff=Math.ceil((hoy-venc)/(1000*60*60*24));
+    if(diff>maxDias) maxDias=diff;
+  }
+  return maxDias;
 }
 
 function diasParaVencer(c){
   const hoy=new Date();hoy.setHours(0,0,0,0);
-  const venc=c.vencimiento?new Date(c.vencimiento):null;
-  if(!venc) return 999;
-  return Math.ceil((venc-hoy)/(1000*60*60*24));
+  const cargos=(c.movimientos||[]).filter(m=>m.tipo==='cargo'&&m.vencimiento);
+  if(!cargos.length) return 999;
+  let minDiff=999;
+  for(const m of cargos){
+    const venc=new Date(m.vencimiento);
+    const diff=Math.ceil((venc-hoy)/(1000*60*60*24));
+    if(diff>=0&&diff<minDiff) minDiff=diff;
+  }
+  return minDiff;
 }
 
 function badgeEstado(c){
