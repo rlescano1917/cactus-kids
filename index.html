@@ -413,7 +413,14 @@ function limpiarTel(tel){
 function abrirWhatsApp(tel, nombre){
   const num = '549' + limpiarTel(tel);
   const msg = encodeURIComponent('Hola ' + nombre + '! Te registramos como cliente de Cactus Kids. Cualquier consulta estamos a tu disposicion!');
-  window.open('https://wa.me/' + num + '?text=' + msg, '_blank');
+  const url = 'https://wa.me/' + num + '?text=' + msg;
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 window.guardarCliente=async function(){
@@ -436,8 +443,11 @@ function renderLista(){const q=(document.getElementById('buscador').value||'').t
 window.verCliente=function(id){const c=clientes.find(x=>x.id===id);if(!c)return;const cr=c.tipo==='critico';const hj=c.hijos&&c.hijos.length?c.hijos.map(h=>'<div style="background:#f1efe8;border-radius:8px;padding:8px;margin-bottom:6px;font-size:13px;"><strong>'+(h.nombre||'Sin nombre')+'</strong><br>'+(h.fechaNac?'Nac: '+h.fechaNac+' · ':'')+( h.talle?'Talle: '+h.talle:'')+(h.genero?' · '+h.genero:'')+'</div>').join(''):'<span style="color:#5f5e5a;font-size:13px;">Sin hijos registrados</span>';const tel=c.tel||'';
   const tel2=c.tel2||'';
   const tel2Desc=c.tel2Desc||'';
-  const waBtn=tel?'<button onclick="abrirWhatsApp(\''+tel+'\',\''+c.nombre+'\')" style="font-size:12px;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5;border-radius:6px;padding:3px 10px;cursor:pointer;margin-left:8px;">Enviar WA</button>':'';
-  const wa2Btn=tel2?'<button onclick="abrirWhatsApp(\''+tel2+'\',\''+c.nombre+'\')" style="font-size:12px;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5;border-radius:6px;padding:3px 10px;cursor:pointer;margin-left:8px;">Enviar WA</button>':'';
+  const waNum='549'+limpiarTel(tel);
+  const waMsg=encodeURIComponent('Hola '+c.nombre+'! Te registramos como cliente de Cactus Kids. Cualquier consulta estamos a tu disposicion!');
+  const waBtn=tel?'<a href="https://wa.me/'+waNum+'?text='+waMsg+'" target="_blank" rel="noopener" style="font-size:12px;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5;border-radius:6px;padding:3px 10px;cursor:pointer;margin-left:8px;text-decoration:none;display:inline-block;">Enviar WA</a>':'';
+  const wa2Num=tel2?'549'+limpiarTel(tel2):'';
+  const wa2Btn=tel2?'<a href="https://wa.me/'+wa2Num+'?text='+waMsg+'" target="_blank" rel="noopener" style="font-size:12px;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5;border-radius:6px;padding:3px 10px;cursor:pointer;margin-left:8px;text-decoration:none;display:inline-block;">Enviar WA</a>':'';
   const al=cr?'<div style="background:#fcebeb;border-radius:8px;padding:10px 14px;margin-bottom:1rem"><strong style="color:#791f1f;display:block">No otorgar credito ni fiado</strong><span style="font-size:13px;color:#a32d2d">Cliente critico.</span></div>':'';const m=document.getElementById('modal-content');m.className='modal';m.innerHTML=al+'<h3>'+c.nombre+' '+c.apellido+'</h3>'+'<div class="modal-field"><span>DNI</span>'+val(c.dni)+'</div>'
     +'<div class="modal-field"><span>WhatsApp principal</span><div style="display:flex;align-items:center;">'+(tel||'—')+waBtn+'</div></div>'
     +(tel2?'<div class="modal-field"><span>WA secundario'+(tel2Desc?' ('+tel2Desc+')':'')+'</span><div style="display:flex;align-items:center;">'+tel2+wa2Btn+'</div></div>':'')+'<div class="modal-field"><span>Telefono</span>'+val(c.tel)+'</div>'+'<div class="modal-field"><span>Ciudad</span>'+val(c.ciudad)+'</div>'+'<div class="modal-field"><span>Tipo</span>'+(c.tipo||'regular')+'</div>'+'<div class="modal-field"><span>Hijos</span>'+hj+'</div>'+'<div class="modal-field"><span>Notas</span>'+val(c.notas)+'</div>'+'<div class="modal-actions"><button class="btn-delete" onclick="eliminarCliente(\''+c.id+'\')">Eliminar</button><button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>';document.getElementById('modal-bg').classList.add('open');}
