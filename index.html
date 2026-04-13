@@ -143,6 +143,7 @@ textarea{height:60px;resize:vertical}
     <div class="header-right">
       <span class="badge-cloud">En la nube</span>
       <span class="usuario-text" id="usuario-text"></span>
+      <button onclick="exportarTodo()" style="font-size:12px;padding:4px 12px;border-radius:8px;border:0.5px solid #5dcaa5;background:#e1f5ee;color:#085041;cursor:pointer">Exportar Excel</button>
       <button class="btn-logout" onclick="doLogout()">Salir</button>
     </div>
   </div>
@@ -883,6 +884,67 @@ window.aplicarMora=async function(cuentaId,montoMora){
   try{await fsPatch('cuentas',cuentaId,{clienteId:c.clienteId,clienteNombre:c.clienteNombre,movimientos:movs,fechaCreacion:c.fechaCreacion||''});c.movimientos=movs;toast('Mora aplicada!','ok');cerrarModal();renderCuentas();setTimeout(()=>verCuenta(cuentaId),200);}
   catch(e){toast('Error al aplicar mora','err');}
 };
+
+// ==================== EXPORTAR A EXCEL ====================
+window.exportarTodo = function() {
+  if (!clientes.length && !ventas.length && !cuentas.length) {
+    toast('No hay datos para exportar', 'err');
+    return;
+  }
+
+  const NL = String.fromCharCode(10);
+  const limpiar = v => String(v||'').replace(/,/g,' ').replace(/[\r\n]+/g,' ').replace(/"/g,'""');
+  const cel = v => '"' + limpiar(v) + '"';
+  const fila = arr => arr.map(cel).join(',') + NL;
+
+  let csv = '';
+
+  // CLIENTES
+  csv += 'CLIENTES' + NL;
+  csv += fila(['Nombre','Apellido','DNI','Fecha Nac','WhatsApp','WA Secundario','Desc Secundario','Email','Ciudad','Tipo','Como llego','Notas','Fecha Alta']);
+  for (const c of clientes) {
+    csv += fila([
+      c.nombre, c.apellido, c.dni, c.fnac,
+      c.tel, c.tel2, c.tel2Desc,
+      c.email, c.ciudad, c.tipo, c.origen, c.notas,
+      c.fechaAlta ? new Date(c.fechaAlta).toLocaleDateString('es-AR') : ''
+    ]);
+  }
+
+  csv += NL;
+
+  // VENTAS
+  csv += 'VENTAS' + NL;
+  csv += fila(['Fecha','Cliente','Productos','Total','Forma de Pago','Ajuste','Notas']);
+  for (const v of ventas) {
+    const prods = (v.productos||[]).map(p => (p.desc||'')+(p.talle?' '+p.talle:'')+' x'+(p.cantidad||1)+' $'+(p.precio||0)).join(' | ');
+    csv += fila([v.fecha, v.clienteNombre, prods, Math.round(v.total||0), v.formaPago, v.ajuste, v.notas]);
+  }
+
+  csv += NL;
+
+  // CUENTAS CORRIENTES
+  csv += 'CUENTAS CORRIENTES' + NL;
+  csv += fila(['Cliente','Tipo','Descripcion','Monto','Fecha','Vencimiento']);
+  for (const c of cuentas) {
+    for (const m of (c.movimientos||[])) {
+      csv += fila([c.clienteNombre, m.tipo, m.desc, Math.round(m.monto||0), m.fecha, m.vencimiento||'']);
+    }
+  }
+
+  const BOM = '\uFEFF';
+  const blob = new Blob([BOM + csv], {type: 'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'CactusKids_backup_' + new Date().toISOString().slice(0,10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Exportado correctamente!', 'ok');
+};
+
 </script>
 </body>
 </html>
