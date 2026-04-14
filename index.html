@@ -507,7 +507,7 @@ window.guardarCliente=async function(){
   if(clientes.find(c=>c.dni===dni)){toast('Ya existe un cliente con ese DNI','err');return;}
   const tel2=limpiarTel(document.getElementById('f-tel2')?.value||'');
   const tel2Desc=document.getElementById('f-tel2desc')?.value.trim()||'';
-  const c={nombre,apellido,dni,fnac:document.getElementById('f-fnac').value,tel,tel2,tel2Desc,email:document.getElementById('f-email').value,ciudad:document.getElementById('f-ciudad').value,origen:document.getElementById('f-origen').value,tipo:document.getElementById('f-tipo').value,notas:document.getElementById('f-notas').value,hijos:getHijos(hijosTemp),fechaAlta:new Date().toISOString()};
+  const c={nombre,apellido,dni,fnac:document.getElementById('f-fnac').value,tel,tel2,tel2Desc,email:document.getElementById('f-email').value,ciudad:document.getElementById('f-ciudad').value,origen:document.getElementById('f-origen').value,tipo:document.getElementById('f-tipo').value,notas:document.getElementById('f-notas').value,hijos:getHijos(hijosTemp),puntos:0,fechaAlta:new Date().toISOString()};
   try{const doc=await fsAdd('clientes',c);clientes.unshift(doc);limpiarFormCl();toast('Cliente guardado!','ok');showTabCl('lista');}
   catch(e){toast('Error al guardar','err');}
 };
@@ -533,7 +533,9 @@ function renderClientes(){
     const cr=c.tipo==='critico';
     const hj=c.hijos?.length?'<span class="badge">'+c.hijos.length+' hijo'+(c.hijos.length>1?'s':'')+'</span>':'';
     const tp=cr?'<span class="badge critico">Sin credito</span>':c.tipo==='vip'?'<span class="badge vip">VIP</span>':'';
-    return '<div class="row'+(cr?' danger':'')+'" onclick="verCliente(\''+c.id+'\')"><div class="avatar'+(cr?' danger':'')+'">'+ini.toUpperCase()+'</div><div class="info"><strong>'+c.nombre+' '+c.apellido+'</strong><span>DNI '+(c.dni||'—')+' · '+(c.tel||'Sin tel')+(c.ciudad?' · '+c.ciudad:'')+'</span></div><div style="display:flex;gap:4px;flex-shrink:0">'+hj+tp+'</div></div>';
+    const pts=(c.puntos||0);
+    const ptsBadge=pts>0?'<span class="badge" style="background:#faeeda;color:#633806;border-color:#fac775">'+pts+' pts</span>':'';
+    return '<div class="row'+(cr?' danger':'')+'" onclick="verCliente(\''+c.id+'\')"><div class="avatar'+(cr?' danger':'')+'">'+ini.toUpperCase()+'</div><div class="info"><strong>'+c.nombre+' '+c.apellido+'</strong><span>DNI '+(c.dni||'—')+' · '+(c.tel||'Sin tel')+(c.ciudad?' · '+c.ciudad:'')+'</span></div><div style="display:flex;gap:4px;flex-shrink:0">'+hj+tp+ptsBadge+'</div></div>';
   }).join('');
 }
 
@@ -556,6 +558,14 @@ window.verCliente=function(id){
     +'<div class="mf"><span>Alta</span>'+(c.fechaAlta?new Date(c.fechaAlta).toLocaleDateString('es-AR'):'—')+'</div>'
     +'<div class="mf"><span>Hijos</span>'+hj+'</div>'
     +'<div class="mf"><span>Notas</span>'+val(c.notas)+'</div>'
+    +'<div style="background:#faeeda;border:0.5px solid #fac775;border-radius:8px;padding:0.75rem 1rem;margin:0.75rem 0">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center">'
+    +'<div><div style="font-size:12px;color:#633806;margin-bottom:2px">Puntos acumulados</div>'
+    +'<div style="font-size:22px;font-weight:500;color:#633806">'+(c.puntos||0)+' pts</div>'
+    +'<div style="font-size:11px;color:#8a5a00;margin-top:2px">Faltan '+(Math.max(0,10-(c.puntos||0)%10))+' pts para el proximo descuento de $500</div>'
+    +'</div>'
+    +((c.puntos||0)>=10?'<button onclick="canjearPuntos(\''+c.id+'\')" style="padding:8px 14px;font-size:13px;font-weight:500;background:#633806;color:#fff;border:none;border-radius:8px;cursor:pointer">Canjear $500</button>':'')
+    +'</div></div>'
     +'<div class="mactions"><button class="btn-edit" onclick="editarCliente(\''+c.id+'\')">Editar</button><button class="btn-del" onclick="eliminarCliente(\''+c.id+'\')">Eliminar</button><button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>');
 };
 
@@ -675,6 +685,25 @@ window.guardarVenta=async function(){
   const venta={clienteId:cliSelVId,clienteNombre:cliSelVNombre,productos,total,ajuste:window._ajL||'',formaPago:pagoSel,notas:document.getElementById('v-notas').value,fecha,fechaCreacion:new Date().toISOString()};
   try{
     const doc=await fsAdd('ventas',venta);ventas.unshift(doc);
+    // Sumar puntos: 1 punto por cada $1000 gastados (solo ventas no fiado)
+    if(pagoSel!=='fiado'){
+      const ptsGanados=Math.floor(total/1000);
+      if(ptsGanados>0){
+        const cli=clientes.find(c=>c.id===cliSelVId);
+        if(cli){
+          const ptsAntes=cli.puntos||0;
+          const ptsDespues=ptsAntes+ptsGanados;
+          await fsPatch('clientes',cliSelVId,{puntos:ptsDespues});
+          cli.puntos=ptsDespues;
+          const descuento=Math.floor(ptsDespues/10);
+          if(descuento>Math.floor(ptsAntes/10)){
+            toast('Venta registrada! '+cliSelVNombre+' tiene '+ptsDespues+' pts y puede canjear $500!','ok');
+          } else {
+            toast('Venta registrada! '+cliSelVNombre+' gano '+ptsGanados+' pts. Total: '+ptsDespues+' pts','ok');
+          }
+      }}
+    }
+
     if(pagoSel==='fiado'){
       let cuenta=cuentas.find(c=>c.clienteId===cliSelVId);
       const descBase='Venta '+(productos.map(p=>p.desc).join(', ')).substring(0,40);
@@ -883,6 +912,33 @@ window.aplicarMora=async function(cuentaId,montoMora){
   const movs=[...(c.movimientos||[]),mov];
   try{await fsPatch('cuentas',cuentaId,{clienteId:c.clienteId,clienteNombre:c.clienteNombre,movimientos:movs,fechaCreacion:c.fechaCreacion||''});c.movimientos=movs;toast('Mora aplicada!','ok');cerrarModal();renderCuentas();setTimeout(()=>verCuenta(cuentaId),200);}
   catch(e){toast('Error al aplicar mora','err');}
+};
+
+
+// SISTEMA DE PUNTOS
+// 1 punto por cada $1000 gastados
+// 10 puntos = $500 de descuento
+const PUNTOS_POR_MIL = 1;
+const PUNTOS_PARA_DESCUENTO = 10;
+const VALOR_DESCUENTO = 500;
+
+window.canjearPuntos = async function(clienteId) {
+  const cli = clientes.find(c=>c.id===clienteId);
+  if (!cli) return;
+  const pts = cli.puntos||0;
+  if (pts < PUNTOS_PARA_DESCUENTO) { toast('No tiene suficientes puntos','err'); return; }
+  const descuentos = Math.floor(pts/PUNTOS_PARA_DESCUENTO);
+  const totalDescuento = descuentos * VALOR_DESCUENTO;
+  const ptsUsados = descuentos * PUNTOS_PARA_DESCUENTO;
+  const ptsRestantes = pts - ptsUsados;
+  if (!confirm(cli.nombre+' tiene '+pts+' puntos. Canjear '+ptsUsados+' pts por $'+totalDescuento+' de descuento? Le quedan '+ptsRestantes+' pts.')) return;
+  try {
+    await fsPatch('clientes', clienteId, {puntos: ptsRestantes});
+    cli.puntos = ptsRestantes;
+    toast('Canjeados! $'+totalDescuento+' de descuento para '+cli.nombre,'ok');
+    cerrarModal();
+    renderClientes();
+  } catch(e) { toast('Error al canjear','err'); }
 };
 
 // ==================== EXPORTAR A EXCEL ====================
