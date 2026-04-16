@@ -151,6 +151,7 @@ textarea{height:60px;resize:vertical}
     <button class="nav-mod active" id="nav-clientes" onclick="cambiarMod('clientes')">Clientes</button>
     <button class="nav-mod" id="nav-ventas" onclick="cambiarMod('ventas')">Ventas</button>
     <button class="nav-mod" id="nav-cuentas" onclick="cambiarMod('cuentas')">Cuentas</button>
+    <button class="nav-mod" id="nav-gastos" onclick="cambiarMod('gastos')">Gastos</button>
   </div>
 
   <!-- CLIENTES -->
@@ -340,6 +341,71 @@ textarea{height:60px;resize:vertical}
   </div>
 </div>
 
+
+  <!-- GASTOS -->
+  <div class="modulo" id="mod-gastos">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <div class="tabs" style="margin-bottom:0">
+        <button class="tab active" id="tab-gl" onclick="showTabG('lista')">Ver gastos</button>
+        <button class="tab" id="tab-gn" onclick="showTabG('nuevo')">+ Nuevo gasto</button>
+        <button class="tab" id="tab-gr" onclick="showTabG('resumen')">Resumen</button>
+      </div>
+      <span class="contador-badge" id="contador-g">...</span>
+    </div>
+
+    <div id="sec-g-lista" class="section active">
+      <div style="display:flex;gap:8px;margin-bottom:1rem">
+        <div class="search-bar" style="flex:1;margin-bottom:0"><input type="text" id="bus-g" placeholder="Buscar gasto..." oninput="renderGastos()"></div>
+        <select id="filtro-mes-g" onchange="renderGastos()" style="font-size:13px;padding:8px 10px;border:0.5px solid #d3d1c7;border-radius:8px;background:#fff;color:#1a1a18">
+          <option value="">Todos los meses</option>
+        </select>
+      </div>
+      <div id="lista-gastos"><div style="text-align:center;padding:2rem;color:#5f5e5a;font-size:14px">Conectando...</div></div>
+    </div>
+
+    <div id="sec-g-nuevo" class="section">
+      <div class="card">
+        <div class="sec-title">Nuevo gasto</div>
+        <div class="fg">
+          <div><label>Tipo</label>
+            <select id="g-tipo">
+              <option value="fijo">Fijo</option>
+              <option value="variable">Variable</option>
+            </select>
+          </div>
+          <div><label>Categoria</label>
+            <select id="g-categoria">
+              <option>Alquiler</option>
+              <option>Servicios</option>
+              <option>Sueldos</option>
+              <option>Mercaderia</option>
+              <option>Packaging</option>
+              <option>Envios</option>
+              <option>Publicidad</option>
+              <option>Impuestos</option>
+              <option>Otro</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg full">
+          <div><label>Descripcion</label><input type="text" id="g-desc" placeholder="Ej: Alquiler local abril..."></div>
+        </div>
+        <div class="fg">
+          <div><label>Monto ($)</label><input type="number" id="g-monto" placeholder="0" min="0"></div>
+          <div><label>Fecha</label><input type="date" id="g-fecha"></div>
+        </div>
+        <div class="fg full">
+          <div><label>Notas (opcional)</label><textarea id="g-notas" placeholder="Observaciones..."></textarea></div>
+        </div>
+        <button class="btn-save" onclick="guardarGasto()">Guardar gasto</button>
+      </div>
+    </div>
+
+    <div id="sec-g-resumen" class="section">
+      <div id="resumen-gastos"></div>
+    </div>
+  </div>
+
 <div class="modal-overlay" id="modal-bg">
   <div class="modal" id="modal-content"></div>
 </div>
@@ -352,7 +418,7 @@ import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from 'htt
 const auth = getAuth(initializeApp({apiKey:"AIzaSyB4MzBpmDKzcQdf7FOjdMQL0Yh8n6QOF6w",authDomain:"cactus-kids-da0b0.firebaseapp.com",projectId:"cactus-kids-da0b0"}));
 const BASE = "https://firestore.googleapis.com/v1/projects/cactus-kids-da0b0/databases/(default)/documents";
 
-let clientes=[], cuentas=[], ventas=[];
+let clientes=[], cuentas=[], ventas=[], gastos=[];
 let hijosTemp=[], editHijosTemp=[], prodsTemp=[];
 let filtroCl='todos', filtroCC='todos';
 let cliSelVId=null, cliSelVNombre='';
@@ -438,8 +504,9 @@ function toFs(data) {
 
 async function initData() {
   try {
-    [clientes,cuentas,ventas]=await Promise.all([fsGet('clientes'),fsGet('cuentas'),fsGet('ventas')]);
-    renderClientes(); renderVentas(); renderCuentas();
+    [clientes,cuentas,ventas,gastos]=await Promise.all([fsGet('clientes'),fsGet('cuentas'),fsGet('ventas'),fsGet('gastos')]);
+    renderClientes(); renderVentas(); renderCuentas(); renderGastos();
+    poblarFiltroMes();
   } catch(e) {
     document.getElementById('lista-clientes').innerHTML='<div style="text-align:center;padding:2rem;color:#a32d2d;font-size:14px">Error al conectar.</div>';
   }
@@ -450,7 +517,7 @@ function val(v){return v&&String(v).trim()?v:'—';}
 function limpiarTel(t){return(t||'').replace(/[^0-9]/g,'');}
 
 // NAVEGACION
-window.cambiarMod=function(m){['clientes','ventas','cuentas'].forEach(x=>{document.getElementById('mod-'+x).classList.toggle('active',m===x);document.getElementById('nav-'+x).classList.toggle('active',m===x);});};
+window.cambiarMod=function(m){['clientes','ventas','cuentas','gastos'].forEach(x=>{document.getElementById('mod-'+x).classList.toggle('active',m===x);document.getElementById('nav-'+x).classList.toggle('active',m===x);});if(m==='gastos')renderResumenGastos();};
 window.showTabCl=function(t){['cl','cn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-cl-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderClientes();};
 window.showTabV=function(t){['vl','vn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-v-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderVentas();if(t==='nuevo')document.getElementById('v-fecha').value=new Date().toISOString().slice(0,10);};
 window.showTabCC=function(t){['ccl','ccn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-cc-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderCuentas();};
@@ -920,27 +987,17 @@ window.aplicarMora=async function(cuentaId,montoMora){
 window.mostrarDistribucion = function(cuentaId) {
   const c = cuentas.find(x=>x.id===cuentaId);
   if (!c) return;
-
-  // Primero mostrar formulario de monto
-  const hoy = new Date(); hoy.setHours(0,0,0,0);
-
-  // Obtener cargos pendientes ordenados por fecha de vencimiento (más antiguos primero)
   const cargosConSaldo = obtenerCargosConSaldo(c);
   const pendientes = cargosConSaldo
     .filter(m => m.saldoPendiente > 0)
     .sort((a,b) => {
-      // Sin fecha de vencimiento van al final
       if (!a.vencimiento && !b.vencimiento) return new Date(a.fecha) - new Date(b.fecha);
       if (!a.vencimiento) return 1;
       if (!b.vencimiento) return -1;
       return new Date(a.vencimiento) - new Date(b.vencimiento);
     });
-
   if (!pendientes.length) { toast('No hay deudas pendientes', 'err'); return; }
-
   const totalPendiente = pendientes.reduce((t,m) => t + m.saldoPendiente, 0);
-
-  // Modal con input de monto
   const modalEl = document.getElementById('modal-content');
   modalEl.innerHTML = '<h3>Registrar pago</h3>'
     + '<div style="background:#e1f5ee;border:0.5px solid #5dcaa5;border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:13px;color:#085041">'
@@ -958,18 +1015,14 @@ window.mostrarDistribucion = function(cuentaId) {
 };
 
 function obtenerCargosConSaldo(c) {
-  // Calcular saldo pendiente por cargo considerando los pagos ya registrados
   const cargos = (c.movimientos||[]).filter(m => m.tipo === 'cargo').map(m => ({...m, saldoPendiente: m.monto}));
   const pagos = (c.movimientos||[]).filter(m => m.tipo === 'pago').sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
-  
-  // Distribuir pagos existentes sobre cargos (FIFO)
   let cargosOrdenados = [...cargos].sort((a,b) => {
     if (!a.vencimiento && !b.vencimiento) return new Date(a.fecha) - new Date(b.fecha);
     if (!a.vencimiento) return 1;
     if (!b.vencimiento) return -1;
     return new Date(a.vencimiento) - new Date(b.vencimiento);
   });
-  
   for (const pago of pagos) {
     let restante = pago.monto;
     for (const cargo of cargosOrdenados) {
@@ -1001,51 +1054,96 @@ window.calcularDistribucion = function(cuentaId) {
       return new Date(a.vencimiento) - new Date(b.vencimiento);
     });
 
+  // Calcular distribución sugerida FIFO
   let restante = monto;
-  let html = '<div style="font-size:13px;font-weight:500;color:#5f5e5a;margin-bottom:8px">Distribución sugerida (más antigua primero)</div>';
-  
-  for (const cargo of pendientes) {
-    if (restante <= 0) break;
-    const aplicar = Math.min(restante, cargo.saldoPendiente);
-    restante -= aplicar;
-    const saldado = aplicar >= cargo.saldoPendiente;
+  const distribucion = pendientes.map(cargo => {
+    const sugerido = Math.min(restante, cargo.saldoPendiente);
+    restante -= sugerido;
+    return {...cargo, montoAplicar: sugerido};
+  });
+
+  // Guardar distribución editable en window para poder modificarla
+  window._distActual = {cuentaId, distribucion, montoTotal: monto};
+
+  renderPreviewDistribucion(hoy);
+  if (btnAplicar) btnAplicar.style.display = 'block';
+};
+
+function renderPreviewDistribucion(hoy) {
+  if (!window._distActual) return;
+  const {distribucion, montoTotal} = window._distActual;
+  const preview = document.getElementById('dist-preview');
+  if (!hoy) { hoy = new Date(); hoy.setHours(0,0,0,0); }
+
+  const totalAplicado = distribucion.reduce((t,d) => t + (d.montoAplicar||0), 0);
+  const sobrante = montoTotal - totalAplicado;
+
+  let html = '<div style="font-size:13px;font-weight:500;color:#5f5e5a;margin-bottom:8px">Distribucion (podés modificar los montos)</div>';
+
+  distribucion.forEach((cargo, i) => {
+    const saldado = (cargo.montoAplicar||0) >= cargo.saldoPendiente;
     const vencido = cargo.vencimiento && new Date(cargo.vencimiento) < hoy;
     const diasV = cargo.vencimiento ? Math.ceil((hoy - new Date(cargo.vencimiento))/(1000*60*60*24)) : 0;
-    
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;margin-bottom:6px;background:'
-      + (saldado ? '#e1f5ee' : '#faeeda') + ';border:0.5px solid ' + (saldado ? '#5dcaa5' : '#fac775') + '">'
+    html += '<div style="padding:8px;border-radius:8px;margin-bottom:6px;background:' + (saldado?'#e1f5ee':'#faeeda') + ';border:0.5px solid ' + (saldado?'#5dcaa5':'#fac775') + '">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
       + '<div><div style="font-size:13px;font-weight:500">' + (cargo.desc||'Cargo') + '</div>'
       + '<div style="font-size:11px;color:#5f5e5a">'
       + (cargo.vencimiento ? (vencido ? 'Vencida hace '+diasV+'d' : 'Vence '+cargo.vencimiento) : 'Sin vencimiento')
       + ' · Deuda: ' + fmt(cargo.saldoPendiente) + '</div></div>'
-      + '<div style="text-align:right">'
-      + '<div style="font-size:14px;font-weight:500;color:' + (saldado ? '#085041' : '#633806') + '">-' + fmt(aplicar) + '</div>'
-      + '<div style="font-size:11px;color:' + (saldado ? '#085041' : '#633806') + '">' + (saldado ? '✅ Saldada' : '⚠️ Parcial') + '</div>'
+      + '<span style="font-size:11px;color:' + (saldado?'#085041':'#633806') + '">' + (saldado?'✅ Saldada':'⚠️ Parcial') + '</span>'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:8px">'
+      + '<label style="font-size:12px;color:#5f5e5a;white-space:nowrap">Monto a aplicar:</label>'
+      + '<input type="number" value="' + (cargo.montoAplicar||0) + '" min="0" max="' + cargo.saldoPendiente + '" '
+      + 'style="width:100%;font-size:14px;padding:5px 8px;border:0.5px solid #d3d1c7;border-radius:6px" '
+      + 'oninput="modificarDistribucion(' + i + ',this.value)">'
       + '</div></div>';
-  }
+  });
 
-  if (restante > 0) {
-    html += '<div style="background:#e6f1fb;border:0.5px solid #85b7eb;border-radius:8px;padding:8px;font-size:13px;color:#185fa5">Sobrante: <strong>' + fmt(restante) + '</strong> (se registra como pago a favor)</div>';
+  if (sobrante > 0) {
+    html += '<div style="background:#e6f1fb;border:0.5px solid #85b7eb;border-radius:8px;padding:8px;font-size:13px;color:#185fa5">Sobrante: <strong>' + fmt(sobrante) + '</strong> (se registra como pago a favor)</div>';
+  } else if (sobrante < 0) {
+    html += '<div style="background:#fcebeb;border:0.5px solid #f09595;border-radius:8px;padding:8px;font-size:13px;color:#a32d2d">⚠️ El total excede el monto del pago en ' + fmt(Math.abs(sobrante)) + '</div>';
   } else {
-    html += '<div style="background:#e1f5ee;border:0.5px solid #5dcaa5;border-radius:8px;padding:8px;font-size:13px;color:#085041">✅ El pago cubre exactamente las deudas seleccionadas</div>';
+    html += '<div style="background:#e1f5ee;border:0.5px solid #5dcaa5;border-radius:8px;padding:8px;font-size:13px;color:#085041">✅ Distribucion exacta</div>';
   }
 
   preview.innerHTML = html;
-  if (btnAplicar) btnAplicar.style.display = 'block';
+}
+
+window.modificarDistribucion = function(idx, valor) {
+  if (!window._distActual) return;
+  const monto = parseFloat(valor) || 0;
+  window._distActual.distribucion[idx].montoAplicar = Math.min(monto, window._distActual.distribucion[idx].saldoPendiente);
+  renderPreviewDistribucion();
 };
 
 window.aplicarDistribucion = async function(cuentaId) {
   const c = cuentas.find(x=>x.id===cuentaId);
   if (!c) return;
-  const monto = parseFloat(document.getElementById('dist-monto')?.value) || 0;
-  const fecha = document.getElementById('dist-fecha')?.value || new Date().toISOString().slice(0,10);
-  if (!monto) { toast('Ingresa un monto', 'err'); return; }
+  if (!window._distActual) return;
 
-  const mov = {tipo:'pago', monto, desc:'Pago (distribucion FIFO)', fecha, vencimiento:'', id:Date.now()};
+  const fecha = document.getElementById('dist-fecha')?.value || new Date().toISOString().slice(0,10);
+  const {distribucion, montoTotal} = window._distActual;
+
+  // Verificar que no exceda el monto total
+  const totalAplicado = distribucion.reduce((t,d) => t + (d.montoAplicar||0), 0);
+  if (totalAplicado > montoTotal) {
+    toast('El total excede el monto del pago', 'err');
+    return;
+  }
+
+  if (totalAplicado === 0) {
+    toast('Ingresa al menos un monto', 'err');
+    return;
+  }
+
+  const mov = {tipo:'pago', monto:montoTotal, desc:'Pago distribuido', fecha, vencimiento:'', id:Date.now()};
   const movs = [...(c.movimientos||[]), mov];
   try {
     await fsPatch('cuentas', cuentaId, {clienteId:c.clienteId, clienteNombre:c.clienteNombre, movimientos:movs, fechaCreacion:c.fechaCreacion||''});
     c.movimientos = movs;
+    window._distActual = null;
     toast('Pago registrado!', 'ok');
     cerrarModal();
     renderCuentas();
