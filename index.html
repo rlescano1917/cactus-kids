@@ -152,6 +152,7 @@ textarea{height:60px;resize:vertical}
     <button class="nav-mod" id="nav-ventas" onclick="cambiarMod('ventas')">Ventas</button>
     <button class="nav-mod" id="nav-cuentas" onclick="cambiarMod('cuentas')">Cuentas</button>
     <button class="nav-mod" id="nav-gastos" onclick="cambiarMod('gastos')">Gastos</button>
+    <button class="nav-mod" id="nav-auditoria" onclick="cambiarMod('auditoria')" style="display:none">Auditoria</button>
   </div>
 
   <!-- CLIENTES -->
@@ -406,6 +407,34 @@ textarea{height:60px;resize:vertical}
     </div>
   </div>
 
+
+  <!-- AUDITORIA -->
+  <div class="modulo" id="mod-auditoria">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <h3 style="font-size:16px;font-weight:500">Log de auditoria</h3>
+      <span class="contador-badge" id="contador-aud">...</span>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+      <select id="filtro-aud-usuario" onchange="renderAuditoria()" style="font-size:13px;padding:8px 10px;border:0.5px solid #d3d1c7;border-radius:8px;background:#fff;color:#1a1a18;flex:1">
+        <option value="">Todos los usuarios</option>
+      </select>
+      <select id="filtro-aud-tipo" onchange="renderAuditoria()" style="font-size:13px;padding:8px 10px;border:0.5px solid #d3d1c7;border-radius:8px;background:#fff;color:#1a1a18;flex:1">
+        <option value="">Todas las acciones</option>
+        <option value="cliente">Clientes</option>
+        <option value="venta">Ventas</option>
+        <option value="cuenta">Cuentas</option>
+        <option value="gasto">Gastos</option>
+      </select>
+      <select id="filtro-aud-fecha" onchange="renderAuditoria()" style="font-size:13px;padding:8px 10px;border:0.5px solid #d3d1c7;border-radius:8px;background:#fff;color:#1a1a18;flex:1">
+        <option value="">Todos los dias</option>
+        <option value="hoy">Hoy</option>
+        <option value="semana">Esta semana</option>
+        <option value="mes">Este mes</option>
+      </select>
+    </div>
+    <div id="lista-auditoria"><div style="text-align:center;padding:2rem;color:#5f5e5a;font-size:14px">Cargando...</div></div>
+  </div>
+
 <div class="modal-overlay" id="modal-bg">
   <div class="modal" id="modal-content"></div>
 </div>
@@ -430,6 +459,10 @@ onAuthStateChanged(auth, user => {
     document.getElementById('login-screen').style.display='none';
     document.getElementById('main-app').style.display='block';
     document.getElementById('usuario-text').textContent=user.email;
+    // Mostrar auditoría solo para admin
+    if(user.email==='rlescano1917@gmail.com'){
+      document.getElementById('nav-auditoria').style.display='';
+    }
     initData();
   } else {
     document.getElementById('login-screen').style.display='flex';
@@ -517,7 +550,7 @@ function val(v){return v&&String(v).trim()?v:'—';}
 function limpiarTel(t){return(t||'').replace(/[^0-9]/g,'');}
 
 // NAVEGACION
-window.cambiarMod=function(m){['clientes','ventas','cuentas','gastos'].forEach(x=>{document.getElementById('mod-'+x).classList.toggle('active',m===x);document.getElementById('nav-'+x).classList.toggle('active',m===x);});if(m==='gastos')renderResumenGastos();};
+window.cambiarMod=function(m){['clientes','ventas','cuentas','gastos','auditoria'].forEach(x=>{document.getElementById('mod-'+x).classList.toggle('active',m===x);const nav=document.getElementById('nav-'+x);if(nav)nav.classList.toggle('active',m===x);});if(m==='gastos')renderResumenGastos();if(m==='auditoria')cargarAuditoria();};
 window.showTabCl=function(t){['cl','cn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-cl-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderClientes();};
 window.showTabV=function(t){['vl','vn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-v-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderVentas();if(t==='nuevo')document.getElementById('v-fecha').value=new Date().toISOString().slice(0,10);};
 window.showTabCC=function(t){['ccl','ccn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-cc-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderCuentas();};
@@ -575,7 +608,7 @@ window.guardarCliente=async function(){
   const tel2=limpiarTel(document.getElementById('f-tel2')?.value||'');
   const tel2Desc=document.getElementById('f-tel2desc')?.value.trim()||'';
   const c={nombre,apellido,dni,fnac:document.getElementById('f-fnac').value,tel,tel2,tel2Desc,email:document.getElementById('f-email').value,ciudad:document.getElementById('f-ciudad').value,origen:document.getElementById('f-origen').value,tipo:document.getElementById('f-tipo').value,notas:document.getElementById('f-notas').value,hijos:getHijos(hijosTemp),puntos:0,fechaAlta:new Date().toISOString()};
-  try{const doc=await fsAdd('clientes',c);clientes.unshift(doc);limpiarFormCl();toast('Cliente guardado!','ok');showTabCl('lista');}
+  try{const doc=await fsAdd('clientes',c);clientes.unshift(doc);logAccion('cliente','crear',nombre+' '+apellido);limpiarFormCl();toast('Cliente guardado!','ok');showTabCl('lista');}
   catch(e){toast('Error al guardar','err');}
 };
 
@@ -664,13 +697,13 @@ window.guardarEdicion=async function(id){
   if(!nombre||!apellido){toast('Completa nombre y apellido','err');return;}
   if(!tel||tel.length<8){toast('El WhatsApp es obligatorio','err');return;}
   const datos={nombre,apellido,dni:document.getElementById('e-dni').value.trim(),fnac:document.getElementById('e-fnac').value,tel,tel2:limpiarTel(document.getElementById('e-tel2').value),tel2Desc:document.getElementById('e-tel2desc').value.trim(),email:document.getElementById('e-email').value,ciudad:document.getElementById('e-ciudad').value,origen:document.getElementById('e-origen').value,tipo:document.getElementById('e-tipo').value,notas:document.getElementById('e-notas').value,hijos:getHijos(editHijosTemp)};
-  try{await fsPatch('clientes',id,datos);const idx=clientes.findIndex(c=>c.id===id);if(idx>=0)clientes[idx]={...clientes[idx],...datos};toast('Cliente actualizado!','ok');cerrarModal();renderClientes();}
+  try{await fsPatch('clientes',id,datos);const idx=clientes.findIndex(c=>c.id===id);if(idx>=0)clientes[idx]={...clientes[idx],...datos};logAccion('cliente','editar',datos.nombre+' '+datos.apellido);toast('Cliente actualizado!','ok');cerrarModal();renderClientes();}
   catch(e){toast('Error al guardar','err');}
 };
 
 window.eliminarCliente=async function(id){
   if(!confirm('Eliminar este cliente?'))return;
-  try{await fsDel('clientes',id);clientes=clientes.filter(c=>c.id!==id);cerrarModal();renderClientes();toast('Cliente eliminado','ok');}
+  try{const cliDel=clientes.find(c=>c.id===id);await fsDel('clientes',id);clientes=clientes.filter(c=>c.id!==id);logAccion('cliente','eliminar',(cliDel?.nombre||'')+' '+(cliDel?.apellido||''));cerrarModal();renderClientes();toast('Cliente eliminado','ok');}
   catch(e){toast('Error al eliminar','err');}
 };
 
@@ -751,7 +784,7 @@ window.guardarVenta=async function(){
   const fecha=document.getElementById('v-fecha').value||new Date().toISOString().slice(0,10);
   const venta={clienteId:cliSelVId,clienteNombre:cliSelVNombre,productos,total,ajuste:window._ajL||'',formaPago:pagoSel,notas:document.getElementById('v-notas').value,fecha,fechaCreacion:new Date().toISOString()};
   try{
-    const doc=await fsAdd('ventas',venta);ventas.unshift(doc);
+    const doc=await fsAdd('ventas',venta);ventas.unshift(doc);logAccion('venta','crear',cliSelVNombre+' '+fmt(total)+' '+pagoSel);
     // Sumar puntos: 1 punto por cada $1000 gastados (solo ventas no fiado)
     if(pagoSel!=='fiado'){
       const ptsGanados=Math.floor(total/1000);
@@ -814,7 +847,7 @@ window.verVenta=function(id){
   const prods=v.productos?.length?v.productos.map(p=>'<div style="background:#f1efe8;border-radius:8px;padding:8px;margin-bottom:6px;font-size:13px;display:flex;justify-content:space-between"><span>'+(p.desc||'—')+(p.talle?' · '+p.talle:'')+' x'+(p.cantidad||1)+'</span><span style="font-weight:500">'+fmt((p.precio||0)*(p.cantidad||1))+'</span></div>').join(''):'<span style="font-size:13px;color:#5f5e5a">Sin detalle</span>';
   abrirModal('<h3>Venta a '+v.clienteNombre+'</h3>'+'<div class="mf"><span>Fecha</span>'+val(v.fecha)+'</div>'+'<div class="mf"><span>Forma de pago</span>'+(v.formaPago||'—')+'</div>'+(v.ajuste?'<div class="mf"><span>Ajuste</span>'+v.ajuste+'</div>':'')+'<div class="mf"><span>Productos</span>'+prods+'</div>'+'<div style="background:#1a1a18;border-radius:8px;padding:0.75rem 1rem;margin:0.75rem 0;display:flex;justify-content:space-between;align-items:center"><span style="color:#f1efe8;font-size:14px">Total</span><span style="color:#fff;font-size:18px;font-weight:500">'+fmt(v.total||0)+'</span></div>'+'<div class="mf"><span>Notas</span>'+val(v.notas)+'</div>'+'<div class="mactions"><button class="btn-del" onclick="eliminarVenta(\''+v.id+'\')">Eliminar</button><button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>');
 };
-window.eliminarVenta=async function(id){if(!confirm('Eliminar esta venta?'))return;try{await fsDel('ventas',id);ventas=ventas.filter(v=>v.id!==id);cerrarModal();renderVentas();toast('Venta eliminada','ok');}catch(e){toast('Error al eliminar','err');}};
+window.eliminarVenta=async function(id){if(!confirm('Eliminar esta venta?'))return;try{const ventaDel=ventas.find(v=>v.id===id);await fsDel('ventas',id);ventas=ventas.filter(v=>v.id!==id);logAccion('venta','eliminar',(ventaDel?.clienteNombre||'')+' '+fmt(ventaDel?.total||0));cerrarModal();renderVentas();toast('Venta eliminada','ok');}catch(e){toast('Error al eliminar','err');}};
 
 // ==================== CUENTAS CORRIENTES ====================
 function saldo(c){return(c.movimientos||[]).reduce((t,m)=>m.tipo==='cargo'?t+m.monto:t-m.monto,0);}
@@ -925,7 +958,7 @@ window.agregarMov=async function(cuentaId,tipo){
   const c=cuentas.find(x=>x.id===cuentaId);
   const nuevo={tipo,monto,desc:desc||(tipo==='cargo'?'Cargo':'Pago'),fecha,vencimiento,id:Date.now()};
   const movs=[...(c.movimientos||[]),nuevo];
-  try{await fsPatch('cuentas',cuentaId,{clienteId:c.clienteId,clienteNombre:c.clienteNombre,movimientos:movs,fechaCreacion:c.fechaCreacion||''});c.movimientos=movs;toast(tipo==='cargo'?'Cargo registrado!':'Pago registrado!','ok');cerrarModal();renderCuentas();setTimeout(()=>verCuenta(cuentaId),200);}
+  try{await fsPatch('cuentas',cuentaId,{clienteId:c.clienteId,clienteNombre:c.clienteNombre,movimientos:movs,fechaCreacion:c.fechaCreacion||''});c.movimientos=movs;logAccion('cuenta',tipo==='cargo'?'cargo':'pago',c.clienteNombre+' '+fmt(monto));toast(tipo==='cargo'?'Cargo registrado!':'Pago registrado!','ok');cerrarModal();renderCuentas();setTimeout(()=>verCuenta(cuentaId),200);}
   catch(e){toast('Error al guardar','err');}
 };
 
@@ -977,7 +1010,7 @@ window.aplicarMora=async function(cuentaId,montoMora){
   const hoy=new Date().toISOString().slice(0,10);
   const mov={tipo:'cargo',monto:montoMora,desc:'Mora 20% mensual',fecha:hoy,vencimiento:'',id:Date.now()};
   const movs=[...(c.movimientos||[]),mov];
-  try{await fsPatch('cuentas',cuentaId,{clienteId:c.clienteId,clienteNombre:c.clienteNombre,movimientos:movs,fechaCreacion:c.fechaCreacion||''});c.movimientos=movs;toast('Mora aplicada!','ok');cerrarModal();renderCuentas();setTimeout(()=>verCuenta(cuentaId),200);}
+  try{await fsPatch('cuentas',cuentaId,{clienteId:c.clienteId,clienteNombre:c.clienteNombre,movimientos:movs,fechaCreacion:c.fechaCreacion||''});c.movimientos=movs;logAccion('cuenta','mora',c.clienteNombre+' '+fmt(montoMora));toast('Mora aplicada!','ok');cerrarModal();renderCuentas();setTimeout(()=>verCuenta(cuentaId),200);}
   catch(e){toast('Error al aplicar mora','err');}
 };
 
@@ -1275,6 +1308,7 @@ window.guardarGasto = async function() {
     gastos.unshift(doc);
     ['g-desc','g-monto','g-notas'].forEach(id => document.getElementById(id).value='');
     poblarFiltroMes();
+    logAccion('gasto','crear',g.categoria+' '+fmt(g.monto));
     toast('Gasto guardado!', 'ok');
     showTabG('lista');
   } catch(e) { toast('Error al guardar', 'err'); }
@@ -1318,7 +1352,8 @@ window.eliminarGasto = async function(id) {
   if (!confirm('Eliminar este gasto?')) return;
   try {
     await fsDel('gastos', id);
-    gastos = gastos.filter(g=>g.id!==id);
+    const gastoDel=gastos.find(g=>g.id===id);gastos = gastos.filter(g=>g.id!==id);
+    logAccion('gasto','eliminar',(gastoDel?.categoria||'')+' '+fmt(gastoDel?.monto||0));
     cerrarModal();
     renderGastos();
     toast('Gasto eliminado', 'ok');
@@ -1370,6 +1405,100 @@ function renderResumenGastos() {
           + '</div>';
       }).join('') : '<div style="font-size:13px;color:#5f5e5a">Sin gastos este mes.</div>')
     + '</div>';
+}
+
+
+
+// ==================== AUDITORÍA ====================
+const ADMIN_EMAIL = 'rlescano1917@gmail.com';
+let logsAuditoria = [];
+
+async function logAccion(tipo, accion, detalle) {
+  try {
+    const user = auth.currentUser;
+    if (!user) return;
+    const log = {
+      usuario: user.email,
+      tipo,       // 'cliente', 'venta', 'cuenta', 'gasto'
+      accion,     // 'crear', 'editar', 'eliminar', 'pago', 'mora', 'canjear'
+      detalle,    // descripción del dato afectado
+      fecha: new Date().toISOString()
+    };
+    await fsAdd('auditoria', log);
+  } catch(e) {
+    // Si falla el log no interrumpir la acción principal
+    console.warn('Error al registrar auditoria:', e);
+  }
+}
+
+async function cargarAuditoria() {
+  const el = document.getElementById('lista-auditoria');
+  try {
+    logsAuditoria = await fsGet('auditoria');
+    logsAuditoria.sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
+    poblarFiltrosAuditoria();
+    renderAuditoria();
+  } catch(e) {
+    if(el) el.innerHTML = '<div style="text-align:center;padding:2rem;color:#a32d2d;font-size:14px">Error al cargar el log.</div>';
+  }
+}
+
+function poblarFiltrosAuditoria() {
+  const sel = document.getElementById('filtro-aud-usuario');
+  if (!sel) return;
+  const usuarios = [...new Set(logsAuditoria.map(l => l.usuario).filter(Boolean))];
+  sel.innerHTML = '<option value="">Todos los usuarios</option>' + usuarios.map(u => '<option value="'+u+'">'+u+'</option>').join('');
+}
+
+function renderAuditoria() {
+  const el = document.getElementById('lista-auditoria');
+  if (!el) return;
+  const filtroUsuario = document.getElementById('filtro-aud-usuario')?.value||'';
+  const filtroTipo = document.getElementById('filtro-aud-tipo')?.value||'';
+  const filtroFecha = document.getElementById('filtro-aud-fecha')?.value||'';
+
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const inicioSemana = new Date(hoy); inicioSemana.setDate(hoy.getDate() - hoy.getDay());
+  const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+
+  let f = logsAuditoria;
+  if (filtroUsuario) f = f.filter(l => l.usuario === filtroUsuario);
+  if (filtroTipo) f = f.filter(l => l.tipo === filtroTipo);
+  if (filtroFecha === 'hoy') f = f.filter(l => new Date(l.fecha) >= hoy);
+  else if (filtroFecha === 'semana') f = f.filter(l => new Date(l.fecha) >= inicioSemana);
+  else if (filtroFecha === 'mes') f = f.filter(l => new Date(l.fecha) >= inicioMes);
+
+  document.getElementById('contador-aud').textContent = f.length + ' accion' + (f.length!==1?'es':'');
+
+  if (!f.length) {
+    el.innerHTML = '<div style="text-align:center;padding:2rem;color:#5f5e5a;font-size:14px">No hay acciones registradas.</div>';
+    return;
+  }
+
+  const colores = {
+    'crear':   {bg:'#e1f5ee', color:'#085041', border:'#5dcaa5'},
+    'editar':  {bg:'#e6f1fb', color:'#0c447c', border:'#85b7eb'},
+    'eliminar':{bg:'#fcebeb', color:'#a32d2d', border:'#f09595'},
+    'pago':    {bg:'#e1f5ee', color:'#085041', border:'#5dcaa5'},
+    'mora':    {bg:'#fcebeb', color:'#a32d2d', border:'#f09595'},
+    'canjear': {bg:'#faeeda', color:'#633806', border:'#fac775'},
+  };
+
+  el.innerHTML = f.map(l => {
+    const cl = colores[l.accion] || {bg:'#f1efe8', color:'#5f5e5a', border:'#d3d1c7'};
+    const fechaStr = new Date(l.fecha).toLocaleString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    return '<div style="background:#fff;border:0.5px solid #e0dfd8;border-radius:12px;padding:0.75rem 1rem;margin-bottom:8px">'
+      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">'
+      + '<span style="font-size:11px;padding:2px 8px;border-radius:6px;font-weight:500;background:'+cl.bg+';color:'+cl.color+';border:0.5px solid '+cl.border+'">'+l.accion+'</span>'
+      + '<span style="font-size:12px;background:#f1efe8;padding:2px 8px;border-radius:6px;color:#5f5e5a">'+l.tipo+'</span>'
+      + '<span style="font-size:13px;font-weight:500;flex:1">'+l.detalle+'</span>'
+      + '</div>'
+      + '<div style="display:flex;justify-content:space-between;font-size:11px;color:#5f5e5a">'
+      + '<span>👤 '+l.usuario+'</span>'
+      + '<span>🕐 '+fechaStr+'</span>'
+      + '</div>'
+      + '</div>';
+  }).join('');
 }
 
 
