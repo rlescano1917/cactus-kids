@@ -840,7 +840,7 @@ window.verCuenta=function(id){
     +'<div class="fg" style="margin-bottom:8px"><div><label>Monto ($)</label><input type="number" id="m-monto" placeholder="0" min="0" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px"></div><div><label>Fecha</label><input type="date" id="m-fecha" value="'+new Date().toISOString().slice(0,10)+'" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px"></div></div>'
     +'<div style="margin-bottom:8px"><label style="font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px">Vencimiento del cargo (opcional)</label><input type="date" id="m-venc" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px"></div>'
     +'<div style="margin-bottom:10px"><label style="font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px">Descripcion</label><input type="text" id="m-desc" placeholder="Detalle..." style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px"></div>'
-    +'<div style="display:flex;gap:8px;margin-bottom:1rem"><button style="flex:1;padding:8px;font-size:13px;font-weight:500;background:#fcebeb;color:#a32d2d;border:0.5px solid #f09595;border-radius:8px;cursor:pointer" onclick="agregarMov(\''+id+'\',\'cargo\')">+ Cargo</button><button style="flex:1;padding:8px;font-size:13px;font-weight:500;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5;border-radius:8px;cursor:pointer" onclick="agregarMov(\''+id+'\',\'pago\')">+ Pago</button></div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:1rem"><button style="flex:1;padding:8px;font-size:13px;font-weight:500;background:#fcebeb;color:#a32d2d;border:0.5px solid #f09595;border-radius:8px;cursor:pointer" onclick="agregarMov(\''+id+'\',\'cargo\')">+ Cargo</button><button style="flex:1;padding:8px;font-size:13px;font-weight:500;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5;border-radius:8px;cursor:pointer" onclick="mostrarDistribucion(\''+id+'\')">+ Pago</button></div>'
     +'<div style="font-size:13px;font-weight:500;color:#5f5e5a;margin:1rem 0 0.5rem;border-bottom:0.5px solid #e0dfd8;padding-bottom:4px">Historial</div>'
     +'<div id="mora-box"></div>'
     +movsHtml
@@ -914,6 +914,144 @@ window.aplicarMora=async function(cuentaId,montoMora){
   catch(e){toast('Error al aplicar mora','err');}
 };
 
+
+
+// DISTRIBUCIÓN SUGERIDA DE PAGOS (MÉTODO FIFO)
+window.mostrarDistribucion = function(cuentaId) {
+  const c = cuentas.find(x=>x.id===cuentaId);
+  if (!c) return;
+
+  // Primero mostrar formulario de monto
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+
+  // Obtener cargos pendientes ordenados por fecha de vencimiento (más antiguos primero)
+  const cargosConSaldo = obtenerCargosConSaldo(c);
+  const pendientes = cargosConSaldo
+    .filter(m => m.saldoPendiente > 0)
+    .sort((a,b) => {
+      // Sin fecha de vencimiento van al final
+      if (!a.vencimiento && !b.vencimiento) return new Date(a.fecha) - new Date(b.fecha);
+      if (!a.vencimiento) return 1;
+      if (!b.vencimiento) return -1;
+      return new Date(a.vencimiento) - new Date(b.vencimiento);
+    });
+
+  if (!pendientes.length) { toast('No hay deudas pendientes', 'err'); return; }
+
+  const totalPendiente = pendientes.reduce((t,m) => t + m.saldoPendiente, 0);
+
+  // Modal con input de monto
+  const modalEl = document.getElementById('modal-content');
+  modalEl.innerHTML = '<h3>Registrar pago</h3>'
+    + '<div style="background:#e1f5ee;border:0.5px solid #5dcaa5;border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:13px;color:#085041">'
+    + 'Deuda total pendiente: <strong>' + fmt(totalPendiente) + '</strong></div>'
+    + '<div class="fg" style="margin-bottom:12px">'
+    + '<div><label>Monto del pago ($)</label><input type="number" id="dist-monto" placeholder="0" min="0" style="width:100%;font-size:14px;padding:8px 10px;border:0.5px solid #d3d1c7;border-radius:8px" oninput="calcularDistribucion(this.dataset.id)" data-id="' + cuentaId + '" autofocus></div>'
+    + '<div><label>Fecha</label><input type="date" id="dist-fecha" value="' + new Date().toISOString().slice(0,10) + '" style="width:100%;font-size:14px;padding:8px 10px;border:0.5px solid #d3d1c7;border-radius:8px"></div>'
+    + '</div>'
+    + '<div id="dist-preview"></div>'
+    + '<div style="display:flex;gap:8px;margin-top:1rem">'
+    + '<button id="dist-btn-aplicar" onclick="aplicarDistribucion(this.dataset.id)" data-id="' + cuentaId + '" style="flex:2;padding:9px;font-size:14px;font-weight:500;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5;border-radius:8px;cursor:pointer;display:none">Aplicar este pago</button>'
+    + '<button onclick="verCuenta(this.dataset.id)" data-id="' + cuentaId + '" style="flex:1;padding:9px;font-size:13px;border:0.5px solid #b4b2a9;color:#5f5e5a;background:transparent;border-radius:8px;cursor:pointer">Cancelar</button>'
+    + '</div>';
+  document.getElementById('modal-bg').classList.add('open');
+};
+
+function obtenerCargosConSaldo(c) {
+  // Calcular saldo pendiente por cargo considerando los pagos ya registrados
+  const cargos = (c.movimientos||[]).filter(m => m.tipo === 'cargo').map(m => ({...m, saldoPendiente: m.monto}));
+  const pagos = (c.movimientos||[]).filter(m => m.tipo === 'pago').sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
+  
+  // Distribuir pagos existentes sobre cargos (FIFO)
+  let cargosOrdenados = [...cargos].sort((a,b) => {
+    if (!a.vencimiento && !b.vencimiento) return new Date(a.fecha) - new Date(b.fecha);
+    if (!a.vencimiento) return 1;
+    if (!b.vencimiento) return -1;
+    return new Date(a.vencimiento) - new Date(b.vencimiento);
+  });
+  
+  for (const pago of pagos) {
+    let restante = pago.monto;
+    for (const cargo of cargosOrdenados) {
+      if (restante <= 0) break;
+      const aplicar = Math.min(restante, cargo.saldoPendiente);
+      cargo.saldoPendiente -= aplicar;
+      restante -= aplicar;
+    }
+  }
+  return cargosOrdenados;
+}
+
+window.calcularDistribucion = function(cuentaId) {
+  const c = cuentas.find(x=>x.id===cuentaId);
+  if (!c) return;
+  const monto = parseFloat(document.getElementById('dist-monto')?.value) || 0;
+  const preview = document.getElementById('dist-preview');
+  const btnAplicar = document.getElementById('dist-btn-aplicar');
+  if (!monto || monto <= 0) { preview.innerHTML = ''; if(btnAplicar) btnAplicar.style.display='none'; return; }
+
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const cargosConSaldo = obtenerCargosConSaldo(c);
+  const pendientes = cargosConSaldo
+    .filter(m => m.saldoPendiente > 0)
+    .sort((a,b) => {
+      if (!a.vencimiento && !b.vencimiento) return new Date(a.fecha) - new Date(b.fecha);
+      if (!a.vencimiento) return 1;
+      if (!b.vencimiento) return -1;
+      return new Date(a.vencimiento) - new Date(b.vencimiento);
+    });
+
+  let restante = monto;
+  let html = '<div style="font-size:13px;font-weight:500;color:#5f5e5a;margin-bottom:8px">Distribución sugerida (más antigua primero)</div>';
+  
+  for (const cargo of pendientes) {
+    if (restante <= 0) break;
+    const aplicar = Math.min(restante, cargo.saldoPendiente);
+    restante -= aplicar;
+    const saldado = aplicar >= cargo.saldoPendiente;
+    const vencido = cargo.vencimiento && new Date(cargo.vencimiento) < hoy;
+    const diasV = cargo.vencimiento ? Math.ceil((hoy - new Date(cargo.vencimiento))/(1000*60*60*24)) : 0;
+    
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;margin-bottom:6px;background:'
+      + (saldado ? '#e1f5ee' : '#faeeda') + ';border:0.5px solid ' + (saldado ? '#5dcaa5' : '#fac775') + '">'
+      + '<div><div style="font-size:13px;font-weight:500">' + (cargo.desc||'Cargo') + '</div>'
+      + '<div style="font-size:11px;color:#5f5e5a">'
+      + (cargo.vencimiento ? (vencido ? 'Vencida hace '+diasV+'d' : 'Vence '+cargo.vencimiento) : 'Sin vencimiento')
+      + ' · Deuda: ' + fmt(cargo.saldoPendiente) + '</div></div>'
+      + '<div style="text-align:right">'
+      + '<div style="font-size:14px;font-weight:500;color:' + (saldado ? '#085041' : '#633806') + '">-' + fmt(aplicar) + '</div>'
+      + '<div style="font-size:11px;color:' + (saldado ? '#085041' : '#633806') + '">' + (saldado ? '✅ Saldada' : '⚠️ Parcial') + '</div>'
+      + '</div></div>';
+  }
+
+  if (restante > 0) {
+    html += '<div style="background:#e6f1fb;border:0.5px solid #85b7eb;border-radius:8px;padding:8px;font-size:13px;color:#185fa5">Sobrante: <strong>' + fmt(restante) + '</strong> (se registra como pago a favor)</div>';
+  } else {
+    html += '<div style="background:#e1f5ee;border:0.5px solid #5dcaa5;border-radius:8px;padding:8px;font-size:13px;color:#085041">✅ El pago cubre exactamente las deudas seleccionadas</div>';
+  }
+
+  preview.innerHTML = html;
+  if (btnAplicar) btnAplicar.style.display = 'block';
+};
+
+window.aplicarDistribucion = async function(cuentaId) {
+  const c = cuentas.find(x=>x.id===cuentaId);
+  if (!c) return;
+  const monto = parseFloat(document.getElementById('dist-monto')?.value) || 0;
+  const fecha = document.getElementById('dist-fecha')?.value || new Date().toISOString().slice(0,10);
+  if (!monto) { toast('Ingresa un monto', 'err'); return; }
+
+  const mov = {tipo:'pago', monto, desc:'Pago (distribucion FIFO)', fecha, vencimiento:'', id:Date.now()};
+  const movs = [...(c.movimientos||[]), mov];
+  try {
+    await fsPatch('cuentas', cuentaId, {clienteId:c.clienteId, clienteNombre:c.clienteNombre, movimientos:movs, fechaCreacion:c.fechaCreacion||''});
+    c.movimientos = movs;
+    toast('Pago registrado!', 'ok');
+    cerrarModal();
+    renderCuentas();
+    setTimeout(() => verCuenta(cuentaId), 200);
+  } catch(e) { toast('Error al guardar', 'err'); }
+};
 
 // SISTEMA DE PUNTOS
 // 1 punto por cada $1000 gastados
