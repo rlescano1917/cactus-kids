@@ -702,8 +702,10 @@ window.guardarEdicion=async function(id){
 };
 
 window.eliminarCliente=async function(id){
-  if(!confirm('Eliminar este cliente?'))return;
-  try{const cliDel=clientes.find(c=>c.id===id);await fsDel('clientes',id);clientes=clientes.filter(c=>c.id!==id);logAccion('cliente','eliminar',(cliDel?.nombre||'')+' '+(cliDel?.apellido||''));cerrarModal();renderClientes();toast('Cliente eliminado','ok');}
+  const cliDel=clientes.find(c=>c.id===id);
+  const motivo=await pedirMotivo('Vas a eliminar a '+( cliDel?.nombre||'')+' '+(cliDel?.apellido||''));
+  if(!motivo)return;
+  try{await fsDel('clientes',id);clientes=clientes.filter(c=>c.id!==id);logAccion('cliente','eliminar',(cliDel?.nombre||'')+' '+(cliDel?.apellido||'')+' · Motivo: '+motivo);cerrarModal();renderClientes();toast('Cliente eliminado','ok');}
   catch(e){toast('Error al eliminar','err');}
 };
 
@@ -847,7 +849,13 @@ window.verVenta=function(id){
   const prods=v.productos?.length?v.productos.map(p=>'<div style="background:#f1efe8;border-radius:8px;padding:8px;margin-bottom:6px;font-size:13px;display:flex;justify-content:space-between"><span>'+(p.desc||'—')+(p.talle?' · '+p.talle:'')+' x'+(p.cantidad||1)+'</span><span style="font-weight:500">'+fmt((p.precio||0)*(p.cantidad||1))+'</span></div>').join(''):'<span style="font-size:13px;color:#5f5e5a">Sin detalle</span>';
   abrirModal('<h3>Venta a '+v.clienteNombre+'</h3>'+'<div class="mf"><span>Fecha</span>'+val(v.fecha)+'</div>'+'<div class="mf"><span>Forma de pago</span>'+(v.formaPago||'—')+'</div>'+(v.ajuste?'<div class="mf"><span>Ajuste</span>'+v.ajuste+'</div>':'')+'<div class="mf"><span>Productos</span>'+prods+'</div>'+'<div style="background:#1a1a18;border-radius:8px;padding:0.75rem 1rem;margin:0.75rem 0;display:flex;justify-content:space-between;align-items:center"><span style="color:#f1efe8;font-size:14px">Total</span><span style="color:#fff;font-size:18px;font-weight:500">'+fmt(v.total||0)+'</span></div>'+'<div class="mf"><span>Notas</span>'+val(v.notas)+'</div>'+'<div class="mactions"><button class="btn-del" onclick="eliminarVenta(\''+v.id+'\')">Eliminar</button><button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>');
 };
-window.eliminarVenta=async function(id){if(!confirm('Eliminar esta venta?'))return;try{const ventaDel=ventas.find(v=>v.id===id);await fsDel('ventas',id);ventas=ventas.filter(v=>v.id!==id);logAccion('venta','eliminar',(ventaDel?.clienteNombre||'')+' '+fmt(ventaDel?.total||0));cerrarModal();renderVentas();toast('Venta eliminada','ok');}catch(e){toast('Error al eliminar','err');}};
+window.eliminarVenta=async function(id){
+  const ventaDel=ventas.find(v=>v.id===id);
+  const motivo=await pedirMotivo('Vas a eliminar una venta de '+(ventaDel?.clienteNombre||'')+' por '+fmt(ventaDel?.total||0));
+  if(!motivo)return;
+  try{await fsDel('ventas',id);ventas=ventas.filter(v=>v.id!==id);logAccion('venta','eliminar',(ventaDel?.clienteNombre||'')+' '+fmt(ventaDel?.total||0)+' · Motivo: '+motivo);cerrarModal();renderVentas();toast('Venta eliminada','ok');}
+  catch(e){toast('Error al eliminar','err');}
+};
 
 // ==================== CUENTAS CORRIENTES ====================
 function saldo(c){return(c.movimientos||[]).reduce((t,m)=>m.tipo==='cargo'?t+m.monto:t-m.monto,0);}
@@ -963,10 +971,12 @@ window.agregarMov=async function(cuentaId,tipo){
 };
 
 window.eliminarMov=async function(cuentaId,movId){
-  if(!confirm('Eliminar este movimiento?'))return;
-  const c=cuentas.find(x=>x.id===cuentaId);
-  const movs=(c.movimientos||[]).filter(m=>m.id!==movId);
-  try{await fsPatch('cuentas',cuentaId,{clienteId:c.clienteId,clienteNombre:c.clienteNombre,movimientos:movs,fechaCreacion:c.fechaCreacion||''});c.movimientos=movs;cerrarModal();renderCuentas();setTimeout(()=>verCuenta(cuentaId),200);}
+  const cuentaMov=cuentas.find(x=>x.id===cuentaId);
+  const movDel=(cuentaMov?.movimientos||[]).find(m=>m.id===movId);
+  const motivo=await pedirMotivo('Vas a eliminar un '+(movDel?.tipo||'movimiento')+' de '+fmt(movDel?.monto||0)+' de '+(cuentaMov?.clienteNombre||''));
+  if(!motivo)return;
+  const movs=(cuentaMov.movimientos||[]).filter(m=>m.id!==movId);
+  try{await fsPatch('cuentas',cuentaId,{clienteId:cuentaMov.clienteId,clienteNombre:cuentaMov.clienteNombre,movimientos:movs,fechaCreacion:cuentaMov.fechaCreacion||''});cuentaMov.movimientos=movs;logAccion('cuenta','eliminar',(cuentaMov?.clienteNombre||'')+' '+fmt(movDel?.monto||0)+' · Motivo: '+(motivo||''));cerrarModal();renderCuentas();setTimeout(()=>verCuenta(cuentaId),200);}
   catch(e){toast('Error al eliminar','err');}
 };
 
@@ -1349,11 +1359,13 @@ window.verGasto = function(id) {
 };
 
 window.eliminarGasto = async function(id) {
-  if (!confirm('Eliminar este gasto?')) return;
+  const gastoDel=gastos.find(g=>g.id===id);
+  const motivo=await pedirMotivo('Vas a eliminar un gasto de '+(gastoDel?.categoria||'')+' por '+fmt(gastoDel?.monto||0));
+  if(!motivo)return;
   try {
     await fsDel('gastos', id);
-    const gastoDel=gastos.find(g=>g.id===id);gastos = gastos.filter(g=>g.id!==id);
-    logAccion('gasto','eliminar',(gastoDel?.categoria||'')+' '+fmt(gastoDel?.monto||0));
+    gastos = gastos.filter(g=>g.id!==id);
+    logAccion('gasto','eliminar',(gastoDel?.categoria||'')+' '+fmt(gastoDel?.monto||0)+' · Motivo: '+motivo);
     cerrarModal();
     renderGastos();
     toast('Gasto eliminado', 'ok');
@@ -1408,6 +1420,33 @@ function renderResumenGastos() {
 }
 
 
+
+
+// MOTIVO DE ELIMINACIÓN
+function pedirMotivo(mensaje) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem';
+    overlay.innerHTML = '<div style="background:#fff;border-radius:12px;padding:1.5rem;width:90%;max-width:400px;border:0.5px solid #e0dfd8">'
+      + '<div style="font-size:16px;font-weight:500;margin-bottom:0.5rem">Confirmar eliminacion</div>'
+      + '<div style="font-size:14px;color:#5f5e5a;margin-bottom:1rem">'+mensaje+'</div>'
+      + '<label style="font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px">Motivo de la eliminacion <span style="color:#a32d2d">*</span></label>'
+      + '<textarea id="motivo-input" placeholder="Explicá por qué eliminás este registro..." style="width:100%;font-size:14px;padding:8px 10px;border:0.5px solid #d3d1c7;border-radius:8px;height:80px;resize:none;font-family:inherit;margin-bottom:4px"></textarea>'
+      + '<div id="motivo-error" style="font-size:12px;color:#a32d2d;margin-bottom:12px;display:none">El motivo es obligatorio</div>'
+      + '<div style="display:flex;gap:8px">'
+      + '<button id="motivo-cancelar" style="flex:1;padding:9px;font-size:14px;border:0.5px solid #b4b2a9;color:#5f5e5a;background:transparent;border-radius:8px;cursor:pointer">Cancelar</button>'
+      + '<button id="motivo-confirmar" style="flex:1;padding:9px;font-size:14px;font-weight:500;background:#fcebeb;color:#a32d2d;border:0.5px solid #f09595;border-radius:8px;cursor:pointer">Eliminar</button>'
+      + '</div></div>';
+    document.body.appendChild(overlay);
+    document.getElementById('motivo-cancelar').onclick = () => { document.body.removeChild(overlay); resolve(null); };
+    document.getElementById('motivo-confirmar').onclick = () => {
+      const motivo = document.getElementById('motivo-input').value.trim();
+      if (!motivo) { document.getElementById('motivo-error').style.display='block'; return; }
+      document.body.removeChild(overlay);
+      resolve(motivo);
+    };
+  });
+}
 
 // ==================== AUDITORÍA ====================
 const ADMIN_EMAIL = 'rlescano1917@gmail.com';
