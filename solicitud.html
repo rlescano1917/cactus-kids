@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solicitud de Credito - Cactus Kids</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#f5f5f0;color:#1a1a18;padding:1rem}
+.container{max-width:500px;margin:0 auto}
+.header{text-align:center;padding:1.5rem 0 1rem}
+.header h1{font-size:22px;font-weight:500;margin-bottom:4px}
+.header p{font-size:14px;color:#5f5e5a}
+.card{background:#fff;border:0.5px solid #e0dfd8;border-radius:12px;padding:1.25rem;margin-bottom:1rem}
+.sec-title{font-size:13px;font-weight:500;color:#5f5e5a;margin:1rem 0 0.5rem;border-bottom:0.5px solid #e0dfd8;padding-bottom:6px}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.fg.full{grid-template-columns:1fr}
+label{font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px}
+input,select,textarea{width:100%;font-size:14px;padding:8px 10px;border:0.5px solid #d3d1c7;border-radius:8px;background:#fff;color:#1a1a18;outline:none;font-family:inherit}
+input:focus,select:focus,textarea:focus{border-color:#888780}
+textarea{height:70px;resize:vertical}
+.required{color:#a32d2d}
+.foto-box{border:2px dashed #d3d1c7;border-radius:8px;padding:1rem;text-align:center;cursor:pointer;margin-bottom:8px;transition:border-color 0.2s}
+.foto-box:hover{border-color:#888780}
+.foto-box input[type=file]{display:none}
+.foto-box .icon{font-size:28px;margin-bottom:6px}
+.foto-box p{font-size:13px;color:#5f5e5a}
+.foto-box.cargada{border-color:#5dcaa5;background:#e1f5ee}
+.foto-box.cargada p{color:#085041}
+.foto-preview{width:100%;border-radius:8px;margin-top:8px;display:none;max-height:200px;object-fit:cover}
+.btn-submit{width:100%;padding:14px;font-size:16px;font-weight:500;background:#1a1a18;color:#fff;border:none;border-radius:8px;cursor:pointer;margin-top:0.5rem}
+.btn-submit:disabled{opacity:0.6;cursor:not-allowed}
+.progreso{background:#f1efe8;border-radius:8px;padding:12px;margin-bottom:1rem;display:none}
+.progreso p{font-size:13px;color:#5f5e5a;margin-bottom:6px}
+.barra{background:#e0dfd8;border-radius:4px;height:8px}
+.barra-inner{background:#1a1a18;border-radius:4px;height:8px;width:0%;transition:width 0.3s}
+.exito{background:#e1f5ee;border:0.5px solid #5dcaa5;border-radius:12px;padding:2rem;text-align:center;display:none}
+.exito h2{font-size:20px;font-weight:500;color:#085041;margin-bottom:8px}
+.exito p{font-size:14px;color:#0f6e56}
+.error-msg{font-size:12px;color:#a32d2d;margin-top:4px;display:none}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Cactus Kids</h1>
+    <p>Completá el formulario para solicitar tu credito</p>
+  </div>
+
+  <div id="form-content">
+    <div class="card">
+      <div class="sec-title">Datos personales</div>
+      <div class="fg">
+        <div><label>Nombre <span class="required">*</span></label><input id="s-nombre" type="text" placeholder="Maria"></div>
+        <div><label>Apellido <span class="required">*</span></label><input id="s-apellido" type="text" placeholder="Gonzalez"></div>
+      </div>
+      <div class="fg">
+        <div><label>DNI <span class="required">*</span></label><input id="s-dni" type="text" placeholder="12345678" maxlength="8"></div>
+        <div><label>Fecha de nac. <span class="required">*</span></label><input id="s-fnac" type="date"></div>
+      </div>
+      <div class="fg full">
+        <div><label>WhatsApp <span class="required">*</span></label><input id="s-tel" type="tel" placeholder="3811234567">
+        <div style="font-size:11px;color:#5f5e5a;margin-top:3px">Solo numeros sin el 0 ni 15</div></div>
+      </div>
+      <div class="fg">
+        <div><label>Email</label><input id="s-email" type="email" placeholder="maria@gmail.com"></div>
+        <div><label>Ciudad / Barrio</label><input id="s-ciudad" type="text" placeholder="Tucuman"></div>
+      </div>
+      <div class="fg full">
+        <div><label>Direccion</label><input id="s-dir" type="text" placeholder="Av. Alem 1234"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sec-title">Informacion laboral</div>
+      <div class="fg">
+        <div><label>Situacion laboral <span class="required">*</span></label>
+          <select id="s-laboral">
+            <option value="">Seleccionar...</option>
+            <option>Empleado en relacion de dependencia</option>
+            <option>Trabajador independiente</option>
+            <option>Comerciante</option>
+            <option>Ama de casa</option>
+            <option>Estudiante</option>
+            <option>Otro</option>
+          </select>
+        </div>
+        <div><label>Lugar de trabajo</label><input id="s-trabajo" type="text" placeholder="Empresa, negocio..."></div>
+      </div>
+      <div class="fg">
+        <div><label>Ingreso mensual aprox. ($)</label><input id="s-ingreso" type="number" placeholder="0" min="0"></div>
+        <div><label>Monto de credito solicitado ($) <span class="required">*</span></label><input id="s-monto" type="number" placeholder="0" min="0"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sec-title">Referencias personales</div>
+      <div class="fg">
+        <div><label>Nombre referencia 1</label><input id="s-ref1-nombre" type="text" placeholder="Juan Perez"></div>
+        <div><label>WhatsApp referencia 1</label><input id="s-ref1-tel" type="tel" placeholder="3811234567"></div>
+      </div>
+      <div class="fg">
+        <div><label>Nombre referencia 2</label><input id="s-ref2-nombre" type="text" placeholder="Ana Lopez"></div>
+        <div><label>WhatsApp referencia 2</label><input id="s-ref2-tel" type="tel" placeholder="3814567890"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sec-title">Documentacion <span class="required">* Obligatorio</span></div>
+      <p style="font-size:13px;color:#5f5e5a;margin-bottom:12px">Subí fotos claras y legibles. Asegurate de que se vean bien todos los datos.</p>
+
+      <label style="font-size:13px;font-weight:500;margin-bottom:8px;display:block">Frente del DNI <span class="required">*</span></label>
+      <div class="foto-box" id="box-frente" onclick="document.getElementById('input-frente').click()">
+        <input type="file" id="input-frente" accept="image/*" capture="environment" onchange="previewFoto('frente',this)">
+        <div class="icon">📄</div>
+        <p>Tocar para sacar foto o subir imagen</p>
+      </div>
+      <img id="preview-frente" class="foto-preview">
+
+      <label style="font-size:13px;font-weight:500;margin:12px 0 8px;display:block">Dorso del DNI <span class="required">*</span></label>
+      <div class="foto-box" id="box-dorso" onclick="document.getElementById('input-dorso').click()">
+        <input type="file" id="input-dorso" accept="image/*" capture="environment" onchange="previewFoto('dorso',this)">
+        <div class="icon">📄</div>
+        <p>Tocar para sacar foto o subir imagen</p>
+      </div>
+      <img id="preview-dorso" class="foto-preview">
+
+      <label style="font-size:13px;font-weight:500;margin:12px 0 8px;display:block">Selfie con DNI <span class="required">*</span></label>
+      <div class="foto-box" id="box-selfie" onclick="document.getElementById('input-selfie').click()">
+        <input type="file" id="input-selfie" accept="image/*" capture="user" onchange="previewFoto('selfie',this)">
+        <div class="icon">🤳</div>
+        <p>Sosteniendo el DNI bien visible</p>
+      </div>
+      <img id="preview-selfie" class="foto-preview">
+    </div>
+
+    <div class="card">
+      <div class="sec-title">Informacion adicional</div>
+      <div class="fg full">
+        <div><label>Como nos conociste</label>
+          <select id="s-origen">
+            <option value="">Seleccionar...</option>
+            <option>Redes sociales</option>
+            <option>Recomendacion de un amigo</option>
+            <option>Paso por el local</option>
+            <option>WhatsApp</option>
+            <option>Otro</option>
+          </select>
+        </div>
+      </div>
+      <div class="fg full">
+        <div><label>Observaciones (opcional)</label><textarea id="s-notas" placeholder="Algo que quieras agregar..."></textarea></div>
+      </div>
+    </div>
+
+    <div class="progreso" id="progreso">
+      <p id="progreso-texto">Subiendo fotos...</p>
+      <div class="barra"><div class="barra-inner" id="barra-inner"></div></div>
+    </div>
+
+    <button class="btn-submit" id="btn-submit" onclick="enviarSolicitud()">Enviar solicitud</button>
+    <p style="font-size:12px;color:#5f5e5a;text-align:center;margin-top:12px;margin-bottom:2rem">Tus datos son confidenciales y solo seran usados para evaluar tu solicitud.</p>
+  </div>
+
+  <div class="exito" id="exito">
+    <div style="font-size:48px;margin-bottom:1rem">✅</div>
+    <h2>Solicitud enviada!</h2>
+    <p>Recibimos tu solicitud. Te contactaremos por WhatsApp en las proximas 48 horas para informarte el resultado.</p>
+    <p style="margin-top:12px;font-size:13px">Gracias por elegir Cactus Kids!</p>
+  </div>
+</div>
+
+<script>
+const CLOUD_NAME = 'dtzboljtk';
+const UPLOAD_PRESET = 'cactus-kids';
+const FIRESTORE_BASE = 'https://firestore.googleapis.com/v1/projects/cactus-kids-da0b0/databases/(default)/documents';
+const API_KEY = 'AIzaSyB4MzBpmDKzcQdf7FOjdMQL0Yh8n6QOF6w';
+
+let fotosSeleccionadas = {frente: null, dorso: null, selfie: null};
+
+function previewFoto(tipo, input) {
+  const file = input.files[0];
+  if (!file) return;
+  fotosSeleccionadas[tipo] = file;
+  const box = document.getElementById('box-'+tipo);
+  const preview = document.getElementById('preview-'+tipo);
+  box.classList.add('cargada');
+  box.querySelector('p').textContent = '✓ ' + file.name;
+  const reader = new FileReader();
+  reader.onload = e => { preview.src = e.target.result; preview.style.display = 'block'; };
+  reader.readAsDataURL(file);
+}
+
+async function subirFoto(file, nombre) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', UPLOAD_PRESET);
+  formData.append('folder', 'solicitudes-credito');
+  formData.append('public_id', nombre+'_'+Date.now());
+  const r = await fetch('https://api.cloudinary.com/v1_1/'+CLOUD_NAME+'/image/upload', {method:'POST', body:formData});
+  const data = await r.json();
+  return data.secure_url;
+}
+
+function setProgreso(pct, texto) {
+  document.getElementById('barra-inner').style.width = pct+'%';
+  document.getElementById('progreso-texto').textContent = texto;
+}
+
+async function enviarSolicitud() {
+  const nombre = document.getElementById('s-nombre').value.trim();
+  const apellido = document.getElementById('s-apellido').value.trim();
+  const dni = document.getElementById('s-dni').value.trim();
+  const fnac = document.getElementById('s-fnac').value;
+  const tel = document.getElementById('s-tel').value.replace(/[^0-9]/g,'');
+  const laboral = document.getElementById('s-laboral').value;
+  const monto = document.getElementById('s-monto').value;
+
+  if (!nombre||!apellido) { alert('Completá nombre y apellido'); return; }
+  if (!dni||dni.length<7) { alert('Ingresá un DNI válido'); return; }
+  if (!fnac) { alert('Ingresá tu fecha de nacimiento'); return; }
+  if (!tel||tel.length<8) { alert('Ingresá tu WhatsApp'); return; }
+  if (!laboral) { alert('Seleccioná tu situación laboral'); return; }
+  if (!monto) { alert('Ingresá el monto de crédito que solicitás'); return; }
+  if (!fotosSeleccionadas.frente) { alert('Subí la foto del frente del DNI'); return; }
+  if (!fotosSeleccionadas.dorso) { alert('Subí la foto del dorso del DNI'); return; }
+  if (!fotosSeleccionadas.selfie) { alert('Subí la selfie con tu DNI'); return; }
+
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true;
+  document.getElementById('progreso').style.display = 'block';
+
+  try {
+    setProgreso(10, 'Subiendo frente del DNI...');
+    const urlFrente = await subirFoto(fotosSeleccionadas.frente, 'frente_'+dni);
+
+    setProgreso(40, 'Subiendo dorso del DNI...');
+    const urlDorso = await subirFoto(fotosSeleccionadas.dorso, 'dorso_'+dni);
+
+    setProgreso(70, 'Subiendo selfie...');
+    const urlSelfie = await subirFoto(fotosSeleccionadas.selfie, 'selfie_'+dni);
+
+    setProgreso(90, 'Guardando solicitud...');
+
+    const solicitud = {
+      nombre, apellido, dni, fnac, tel,
+      email: document.getElementById('s-email').value,
+      ciudad: document.getElementById('s-ciudad').value,
+      dir: document.getElementById('s-dir').value,
+      laboral,
+      trabajo: document.getElementById('s-trabajo').value,
+      ingreso: document.getElementById('s-ingreso').value,
+      montoSolicitado: monto,
+      ref1Nombre: document.getElementById('s-ref1-nombre').value,
+      ref1Tel: document.getElementById('s-ref1-tel').value.replace(/[^0-9]/g,''),
+      ref2Nombre: document.getElementById('s-ref2-nombre').value,
+      ref2Tel: document.getElementById('s-ref2-tel').value.replace(/[^0-9]/g,''),
+      origen: document.getElementById('s-origen').value,
+      notas: document.getElementById('s-notas').value,
+      fotoFrente: urlFrente,
+      fotoDorso: urlDorso,
+      fotoSelfie: urlSelfie,
+      estado: 'pendiente',
+      fechaSolicitud: new Date().toISOString()
+    };
+
+    // Convertir a formato Firestore
+    const fields = {};
+    for (const [k,v] of Object.entries(solicitud)) {
+      fields[k] = {stringValue: String(v)};
+    }
+
+    await fetch(FIRESTORE_BASE+'/solicitudes?key='+API_KEY, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({fields})
+    });
+
+    setProgreso(100, 'Listo!');
+    setTimeout(() => {
+      document.getElementById('form-content').style.display = 'none';
+      document.getElementById('exito').style.display = 'block';
+    }, 500);
+
+  } catch(e) {
+    btn.disabled = false;
+    document.getElementById('progreso').style.display = 'none';
+    alert('Hubo un error al enviar la solicitud. Intentá de nuevo.');
+    console.error(e);
+  }
+}
+</script>
+</body>
+</html>

@@ -153,6 +153,7 @@ textarea{height:60px;resize:vertical}
     <button class="nav-mod" id="nav-cuentas" onclick="cambiarMod('cuentas')">Cuentas</button>
     <button class="nav-mod" id="nav-gastos" onclick="cambiarMod('gastos')">Gastos</button>
     <button class="nav-mod" id="nav-auditoria" onclick="cambiarMod('auditoria')" style="display:none">Auditoria</button>
+    <button class="nav-mod" id="nav-solicitudes" onclick="cambiarMod('solicitudes')" style="display:none">Solicitudes</button>
   </div>
 
   <!-- CLIENTES -->
@@ -408,7 +409,23 @@ textarea{height:60px;resize:vertical}
   </div>
 
 
-  <!-- AUDITORIA -->
+  
+  <!-- SOLICITUDES DE CREDITO -->
+  <div class="modulo" id="mod-solicitudes">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <h3 style="font-size:16px;font-weight:500">Solicitudes de credito</h3>
+      <span class="contador-badge" id="contador-sol">...</span>
+    </div>
+    <div class="filtro-bar">
+      <button class="filtro active" onclick="setFiltroSol('todas',this)">Todas</button>
+      <button class="filtro" style="color:#633806;border-color:#fac775" onclick="setFiltroSol('pendiente',this)">Pendientes</button>
+      <button class="filtro" style="color:#085041;border-color:#5dcaa5" onclick="setFiltroSol('aprobada',this)">Aprobadas</button>
+      <button class="filtro" style="color:#a32d2d;border-color:#f09595" onclick="setFiltroSol('rechazada',this)">Rechazadas</button>
+    </div>
+    <div id="lista-solicitudes"><div style="text-align:center;padding:2rem;color:#5f5e5a;font-size:14px">Cargando...</div></div>
+  </div>
+
+<!-- AUDITORIA -->
   <div class="modulo" id="mod-auditoria">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
       <h3 style="font-size:16px;font-weight:500">Log de auditoria</h3>
@@ -462,6 +479,7 @@ onAuthStateChanged(auth, user => {
     // Mostrar auditoría solo para admin
     if(user.email==='rlescano1917@gmail.com'){
       document.getElementById('nav-auditoria').style.display='';
+      document.getElementById('nav-solicitudes').style.display='';
     }
     initData();
   } else {
@@ -550,7 +568,7 @@ function val(v){return v&&String(v).trim()?v:'—';}
 function limpiarTel(t){return(t||'').replace(/[^0-9]/g,'');}
 
 // NAVEGACION
-window.cambiarMod=function(m){['clientes','ventas','cuentas','gastos','auditoria'].forEach(x=>{document.getElementById('mod-'+x).classList.toggle('active',m===x);const nav=document.getElementById('nav-'+x);if(nav)nav.classList.toggle('active',m===x);});if(m==='gastos')renderResumenGastos();if(m==='auditoria')cargarAuditoria();};
+window.cambiarMod=function(m){['clientes','ventas','cuentas','gastos','auditoria','solicitudes'].forEach(x=>{document.getElementById('mod-'+x).classList.toggle('active',m===x);const nav=document.getElementById('nav-'+x);if(nav)nav.classList.toggle('active',m===x);});if(m==='gastos')renderResumenGastos();if(m==='auditoria')cargarAuditoria();if(m==='solicitudes')cargarSolicitudes();};
 window.showTabCl=function(t){['cl','cn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-cl-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderClientes();};
 window.showTabV=function(t){['vl','vn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-v-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderVentas();if(t==='nuevo')document.getElementById('v-fecha').value=new Date().toISOString().slice(0,10);};
 window.showTabCC=function(t){['ccl','ccn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-cc-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderCuentas();};
@@ -1447,6 +1465,149 @@ function pedirMotivo(mensaje) {
     };
   });
 }
+
+
+// ==================== SOLICITUDES DE CREDITO ====================
+let solicitudes = [];
+let filtroSol = 'todas';
+
+window.setFiltroSol = function(f, el) {
+  filtroSol = f;
+  document.querySelectorAll('#mod-solicitudes .filtro').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderSolicitudes();
+};
+
+async function cargarSolicitudes() {
+  const el = document.getElementById('lista-solicitudes');
+  try {
+    solicitudes = await fsGet('solicitudes');
+    solicitudes.sort((a,b) => new Date(b.fechaSolicitud) - new Date(a.fechaSolicitud));
+    renderSolicitudes();
+  } catch(e) {
+    if(el) el.innerHTML = '<div style="text-align:center;padding:2rem;color:#a32d2d;font-size:14px">Error al cargar solicitudes.</div>';
+  }
+}
+
+function renderSolicitudes() {
+  const el = document.getElementById('lista-solicitudes');
+  if (!el) return;
+  const pendientes = solicitudes.filter(s => s.estado === 'pendiente').length;
+  document.getElementById('contador-sol').textContent = solicitudes.length + ' solicitud' + (solicitudes.length!==1?'es':'') + (pendientes?' · '+pendientes+' pendiente'+(pendientes!==1?'s':''):'');
+  let f = solicitudes;
+  if (filtroSol !== 'todas') f = f.filter(s => s.estado === filtroSol);
+  if (!f.length) { el.innerHTML = '<div style="text-align:center;padding:2rem;color:#5f5e5a;font-size:14px">No hay solicitudes.</div>'; return; }
+  const colores = {
+    pendiente: {bg:'#faeeda', color:'#633806', border:'#fac775', label:'Pendiente'},
+    aprobada:  {bg:'#e1f5ee', color:'#085041', border:'#5dcaa5', label:'Aprobada'},
+    rechazada: {bg:'#fcebeb', color:'#a32d2d', border:'#f09595', label:'Rechazada'}
+  };
+  el.innerHTML = f.map(s => {
+    const cl = colores[s.estado] || colores['pendiente'];
+    const fecha = s.fechaSolicitud ? new Date(s.fechaSolicitud).toLocaleDateString('es-AR') : '—';
+    const ini = (s.nombre?.[0]||'')+(s.apellido?.[0]||'');
+    return '<div class="row" onclick="verSolicitud(this.dataset.id)" data-id="'+s.id+'" style="'+(s.estado==='pendiente'?'border-color:#fac775':'')+'">'
+      +'<div class="avatar" style="background:'+cl.bg+';color:'+cl.color+'">'+ini.toUpperCase()+'</div>'
+      +'<div class="info"><strong>'+s.nombre+' '+s.apellido+'</strong>'
+      +'<span>DNI '+s.dni+' · '+fecha+' · Solicita: '+fmt(parseFloat(s.montoSolicitado)||0)+'</span></div>'
+      +'<span style="font-size:11px;padding:2px 8px;border-radius:8px;background:'+cl.bg+';color:'+cl.color+';border:0.5px solid '+cl.border+';white-space:nowrap">'+cl.label+'</span>'
+      +'</div>';
+  }).join('');
+}
+
+window.verSolicitud = function(id) {
+  const s = solicitudes.find(x=>x.id===id);
+  if (!s) return;
+  const colores = {
+    pendiente: {bg:'#faeeda', color:'#633806', label:'Pendiente'},
+    aprobada:  {bg:'#e1f5ee', color:'#085041', label:'Aprobada'},
+    rechazada: {bg:'#fcebeb', color:'#a32d2d', label:'Rechazada'}
+  };
+  const cl = colores[s.estado] || colores['pendiente'];
+  const waUrl = s.tel ? 'https://wa.me/549'+s.tel+'?text='+encodeURIComponent('Hola '+s.nombre+'! Te contactamos de Cactus Kids en relación a tu solicitud de crédito.') : '';
+
+  abrirModal(
+    '<h3>Solicitud de '+s.nombre+' '+s.apellido+'</h3>'
+    +'<span style="font-size:12px;padding:3px 10px;border-radius:8px;background:'+cl.bg+';color:'+cl.color+';margin-bottom:1rem;display:inline-block">'+cl.label+'</span>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem">'
+    +'<div class="mf"><span>DNI</span>'+val(s.dni)+'</div>'
+    +'<div class="mf"><span>Fecha de nac.</span>'+val(s.fnac)+'</div>'
+    +'<div class="mf"><span>WhatsApp</span><div style="display:flex;align-items:center">'+val(s.tel)+(waUrl?'<a href="'+waUrl+'" target="_blank" class="wa-btn">WA</a>':'')+'</div></div>'
+    +'<div class="mf"><span>Ciudad</span>'+val(s.ciudad)+'</div>'
+    +'<div class="mf"><span>Direccion</span>'+val(s.dir)+'</div>'
+    +'<div class="mf"><span>Email</span>'+val(s.email)+'</div>'
+    +'<div class="mf"><span>Situacion laboral</span>'+val(s.laboral)+'</div>'
+    +'<div class="mf"><span>Lugar de trabajo</span>'+val(s.trabajo)+'</div>'
+    +'<div class="mf"><span>Ingreso mensual</span>'+( s.ingreso?fmt(parseFloat(s.ingreso)):'—')+'</div>'
+    +'<div class="mf"><span>Monto solicitado</span><strong style="color:#185fa5">'+fmt(parseFloat(s.montoSolicitado)||0)+'</strong></div>'
+    +'</div>'
+    +'<div class="mf"><span>Referencias</span>'
+    +(s.ref1Nombre?'<div style="font-size:13px">'+s.ref1Nombre+(s.ref1Tel?' · '+s.ref1Tel:'')+'</div>':'')
+    +(s.ref2Nombre?'<div style="font-size:13px">'+s.ref2Nombre+(s.ref2Tel?' · '+s.ref2Tel:'')+'</div>':'—')
+    +'</div>'
+    +'<div class="mf"><span>Como nos conocio</span>'+val(s.origen)+'</div>'
+    +'<div class="mf"><span>Notas</span>'+val(s.notas)+'</div>'
+    +'<div style="font-size:13px;font-weight:500;color:#5f5e5a;margin:1rem 0 0.5rem;border-bottom:0.5px solid #e0dfd8;padding-bottom:4px">Documentacion</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:1rem">'
+    +(s.fotoFrente?'<div><div style="font-size:11px;color:#5f5e5a;margin-bottom:4px">Frente DNI</div><a href="'+s.fotoFrente+'" target="_blank"><img src="'+s.fotoFrente+'" style="width:100%;border-radius:8px;border:0.5px solid #e0dfd8"></a></div>':'')
+    +(s.fotoDorso?'<div><div style="font-size:11px;color:#5f5e5a;margin-bottom:4px">Dorso DNI</div><a href="'+s.fotoDorso+'" target="_blank"><img src="'+s.fotoDorso+'" style="width:100%;border-radius:8px;border:0.5px solid #e0dfd8"></a></div>':'')
+    +(s.fotoSelfie?'<div><div style="font-size:11px;color:#5f5e5a;margin-bottom:4px">Selfie con DNI</div><a href="'+s.fotoSelfie+'" target="_blank"><img src="'+s.fotoSelfie+'" style="width:100%;border-radius:8px;border:0.5px solid #e0dfd8"></a></div>':'')
+    +'</div>'
+    +(s.estado==='pendiente'?
+      '<div style="display:flex;gap:8px;margin-top:1rem">'
+      +'<button id="btn-ap" style="flex:1;padding:9px;font-size:13px;font-weight:500;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5;border-radius:8px;cursor:pointer">✅ Aprobar</button>'
+      +'<button id="btn-re" style="flex:1;padding:9px;font-size:13px;font-weight:500;background:#fcebeb;color:#a32d2d;border:0.5px solid #f09595;border-radius:8px;cursor:pointer">❌ Rechazar</button>'
+      +'<button class="btn-close" onclick="cerrarModal()">Cerrar</button>'
+      +'</div>'
+      :'<div class="mactions"><button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>')
+  );
+  // Asignar eventos a botones de aprobación
+  setTimeout(() => {
+    const btnAp = document.getElementById('btn-ap');
+    const btnRe = document.getElementById('btn-re');
+    if(btnAp) btnAp.onclick = () => cambiarEstadoSolicitud(id, 'aprobada');
+    if(btnRe) btnRe.onclick = () => cambiarEstadoSolicitud(id, 'rechazada');
+  }, 50);
+};
+
+window.cambiarEstadoSolicitud = async function(id, nuevoEstado) {
+  const s = solicitudes.find(x=>x.id===id);
+  if (!s) return;
+
+  if (nuevoEstado === 'rechazada') {
+    const motivo = await pedirMotivo('Vas a rechazar la solicitud de '+s.nombre+' '+s.apellido);
+    if (!motivo) return;
+    try {
+      await fsPatch('solicitudes', id, {estado: nuevoEstado, motivoRechazo: motivo, fechaResolucion: new Date().toISOString()});
+      s.estado = nuevoEstado; s.motivoRechazo = motivo;
+      const waUrl = 'https://wa.me/549'+s.tel+'?text='+encodeURIComponent('Hola '+s.nombre+'! Te contactamos de Cactus Kids. Lamentablemente no podemos aprobar tu solicitud de crédito en este momento. Motivo: '+motivo+'. Ante cualquier consulta estamos a tu disposición.');
+      cerrarModal(); renderSolicitudes();
+      toast('Solicitud rechazada', 'ok');
+      setTimeout(() => window.open(waUrl, '_blank'), 500);
+    } catch(e) { toast('Error al actualizar', 'err'); }
+  } else {
+    // Aprobar: agregar como cliente
+    if (!confirm('Aprobar a '+s.nombre+' '+s.apellido+' y agregarlo como cliente nuevo?')) return;
+    try {
+      const nuevoCliente = {
+        nombre: s.nombre, apellido: s.apellido, dni: s.dni, fnac: s.fnac,
+        tel: s.tel, tel2: '', tel2Desc: '', email: s.email||'', ciudad: s.ciudad||'',
+        dir: s.dir||'', origen: s.origen||'Solicitud online', tipo: 'nuevo',
+        notas: 'Aprobado desde solicitud online. Monto: '+fmt(parseFloat(s.montoSolicitado)||0),
+        hijos: [], puntos: 0, fechaAlta: new Date().toISOString()
+      };
+      const docCli = await fsAdd('clientes', nuevoCliente);
+      clientes.unshift(docCli);
+      await fsPatch('solicitudes', id, {estado: 'aprobada', fechaResolucion: new Date().toISOString()});
+      s.estado = 'aprobada';
+      logAccion('solicitud', 'aprobar', s.nombre+' '+s.apellido);
+      const waUrl = 'https://wa.me/549'+s.tel+'?text='+encodeURIComponent('Hola '+s.nombre+'! Te contactamos de Cactus Kids. Tu solicitud de crédito fue APROBADA! Podés pasar por el local para coordinar los detalles. Cualquier consulta estamos a tu disposición.');
+      cerrarModal(); renderSolicitudes(); renderClientes();
+      toast('Solicitud aprobada! Cliente agregado.', 'ok');
+      setTimeout(() => window.open(waUrl, '_blank'), 500);
+    } catch(e) { toast('Error al aprobar', 'err'); }
+  }
+};
 
 // ==================== AUDITORÍA ====================
 const ADMIN_EMAIL = 'rlescano1917@gmail.com';
