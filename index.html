@@ -182,8 +182,8 @@ textarea{height:60px;resize:vertical}
         <div class="sec-title">Datos personales</div>
         <div class="alerta" id="alerta-critico"><strong>Cliente sin credito</strong><span>No otorgar credito ni fiado.</span></div>
         <div class="fg">
-          <div><label>Nombre *</label><input id="f-nombre" type="text" placeholder="Maria"></div>
-          <div><label>Apellido *</label><input id="f-apellido" type="text" placeholder="Gonzalez"></div>
+          <div><label>Nombre completo *</label><input id="f-nombre" type="text" placeholder="Maria"></div>
+          <div><label>Apellido completo *</label><input id="f-apellido" type="text" placeholder="Gonzalez"></div>
         </div>
         <div class="fg">
           <div><label>DNI *</label><input id="f-dni" type="text" placeholder="12345678" oninput="checkDni()" maxlength="8">
@@ -708,7 +708,7 @@ window.editarCliente=function(id){
   const tipoOpts=[['regular','Regular'],['vip','VIP'],['nuevo','Nuevo'],['inactivo','Inactivo'],['critico','Sin credito (critico)']].map(([v,l])=>'<option value="'+v+'"'+(c.tipo===v?' selected':'')+'>'+l+'</option>').join('');
   const origenOpts=['Redes sociales','Recomendacion','Paso por el local','WhatsApp','Otro'].map(o=>'<option'+(c.origen===o?' selected':'')+'>'+o+'</option>').join('');
   abrirModal('<h3>Editar cliente</h3>'
-    +'<div class="fg"><div><label>Nombre *</label><input id="e-nombre" type="text" value="'+(c.nombre||'')+'" style="width:100%"></div><div><label>Apellido *</label><input id="e-apellido" type="text" value="'+(c.apellido||'')+'" style="width:100%"></div></div>'
+    +'<div class="fg"><div><label>Nombre completo *</label><input id="e-nombre" type="text" value="'+(c.nombre||'')+'" style="width:100%"></div><div><label>Apellido completo *</label><input id="e-apellido" type="text" value="'+(c.apellido||'')+'" style="width:100%"></div></div>'
     +'<div class="fg"><div><label>DNI</label><input id="e-dni" type="text" value="'+(c.dni||'')+'" maxlength="8" style="width:100%"></div><div><label>Fecha de nac.</label><input id="e-fnac" type="date" value="'+(c.fnac||'')+'" style="width:100%"></div></div>'
     +'<div class="fg full"><div><label>WhatsApp principal *</label><input id="e-tel" type="tel" value="'+(c.tel||'')+'" style="width:100%"></div></div>'
     +'<div class="fg"><div><label>WA secundario</label><input id="e-tel2" type="tel" value="'+(c.tel2||'')+'" style="width:100%"></div><div><label>Descripcion</label><input id="e-tel2desc" type="text" value="'+(c.tel2Desc||'')+'" placeholder="marido, mama..." style="width:100%"></div></div>'
