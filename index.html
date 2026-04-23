@@ -1731,11 +1731,13 @@ function renderSolicitudes() {
     const cl = colores[s.estado] || colores['pendiente'];
     const fecha = s.fechaSolicitud ? new Date(s.fechaSolicitud).toLocaleDateString('es-AR') : '—';
     const ini = (s.nombre?.[0]||'')+(s.apellido?.[0]||'');
+    const esDup = clientes.find(c=>c.dni===s.dni);
     return '<div class="row" onclick="verSolicitud(this.dataset.id)" data-id="'+s.id+'" style="'+(s.estado==='pendiente'?'border-color:#fac775':'')+'">'
       +'<div class="avatar" style="background:'+cl.bg+';color:'+cl.color+'">'+ini.toUpperCase()+'</div>'
       +'<div class="info"><strong>'+s.nombre+' '+s.apellido+'</strong>'
       +'<span>DNI '+s.dni+' · '+fecha+' · Solicita: '+fmt(parseFloat(s.montoSolicitado)||0)+'</span></div>'
       +'<span style="font-size:11px;padding:2px 8px;border-radius:8px;background:'+cl.bg+';color:'+cl.color+';border:0.5px solid '+cl.border+';white-space:nowrap">'+cl.label+'</span>'
+      +(esDup?'<span style="font-size:11px;padding:2px 8px;border-radius:8px;background:#faeeda;color:#633806;border:0.5px solid #fac775;margin-left:4px;white-space:nowrap">⚠️ Duplicado</span>':'')
       +'</div>';
   }).join('');
 }
@@ -1754,6 +1756,7 @@ window.verSolicitud = function(id) {
   abrirModal(
     '<h3>Solicitud de '+s.nombre+' '+s.apellido+'</h3>'
     +'<span style="font-size:12px;padding:3px 10px;border-radius:8px;background:'+cl.bg+';color:'+cl.color+';margin-bottom:1rem;display:inline-block">'+cl.label+'</span>'
+    +(clientes.find(c=>c.dni===s.dni)?'<div style="background:#faeeda;border:0.5px solid #fac775;border-radius:8px;padding:8px 12px;margin-bottom:1rem;font-size:13px;color:#633806">⚠️ <strong>Cliente duplicado</strong> — Este DNI ya existe en la base de clientes.</div>':'')
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem">'
     +'<div class="mf"><span>DNI</span>'+val(s.dni)+'</div>'
     +'<div class="mf"><span>Fecha de nac.</span>'+val(s.fnac)+'</div>'

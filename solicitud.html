@@ -55,7 +55,8 @@ textarea{height:70px;resize:vertical}
         <div><label>Apellido completo <span class="required">*</span></label><input id="s-apellido" type="text" placeholder="Gonzalez"></div>
       </div>
       <div class="fg">
-        <div><label>DNI <span class="required">*</span></label><input id="s-dni" type="text" placeholder="12345678" maxlength="8"></div>
+        <div><label>DNI <span class="required">*</span></label><input id="s-dni" type="text" placeholder="12345678" maxlength="8" oninput="verificarDniSolicitud()">
+            <div id="dni-sol-msg" style="font-size:12px;margin-top:4px;display:none"></div></div>
         <div><label>Fecha de nac. <span class="required">*</span></label><input id="s-fnac" type="date"></div>
       </div>
       <div class="fg full">
@@ -172,6 +173,61 @@ textarea{height:70px;resize:vertical}
 
 <script>
 const CLOUD_NAME = 'dtzboljtk';
+const FIRESTORE_BASE_SOL = 'https://firestore.googleapis.com/v1/projects/cactus-kids-da0b0/databases/(default)/documents';
+const API_KEY_SOL = 'AIzaSyB4MzBpmDKzcQdf7FOjdMQL0Yh8n6QOF6w';
+let dniYaExiste = false;
+
+async function verificarDniSolicitud() {
+  const dni = document.getElementById('s-dni').value.trim();
+  const msg = document.getElementById('dni-sol-msg');
+  if (dni.length < 7) { msg.style.display='none'; dniYaExiste=false; return; }
+
+  try {
+    // Buscar en clientes existentes
+    const r = await fetch(FIRESTORE_BASE_SOL+'/clientes?key='+API_KEY_SOL+'&pageSize=500');
+    const data = await r.json();
+    const clientes = (data.documents||[]).map(d => d.fields?.dni?.stringValue||'');
+    const existe = clientes.includes(dni);
+
+    // Buscar en solicitudes pendientes
+    const r2 = await fetch(FIRESTORE_BASE_SOL+'/solicitudes?key='+API_KEY_SOL+'&pageSize=500');
+    const data2 = await r2.json();
+    const solicitudes = (data2.documents||[]).map(d => ({
+      dni: d.fields?.dni?.stringValue||'',
+      estado: d.fields?.estado?.stringValue||''
+    }));
+    const tieneSolicitud = solicitudes.find(s => s.dni===dni && s.estado==='pendiente');
+
+    if (existe) {
+      msg.style.display = 'block';
+      msg.style.color = '#a32d2d';
+      msg.style.background = '#fcebeb';
+      msg.style.padding = '8px 10px';
+      msg.style.borderRadius = '6px';
+      msg.textContent = 'Ya tenés una cuenta registrada en Cactus Kids. Contactanos directamente por WhatsApp.';
+      dniYaExiste = true;
+    } else if (tieneSolicitud) {
+      msg.style.display = 'block';
+      msg.style.color = '#633806';
+      msg.style.background = '#faeeda';
+      msg.style.padding = '8px 10px';
+      msg.style.borderRadius = '6px';
+      msg.textContent = 'Ya tenés una solicitud pendiente de revisión. Te contactaremos pronto.';
+      dniYaExiste = true;
+    } else {
+      msg.style.display = 'block';
+      msg.style.color = '#085041';
+      msg.style.background = '#e1f5ee';
+      msg.style.padding = '8px 10px';
+      msg.style.borderRadius = '6px';
+      msg.textContent = '✓ DNI disponible';
+      dniYaExiste = false;
+    }
+  } catch(e) {
+    msg.style.display = 'none';
+    dniYaExiste = false;
+  }
+}
 const UPLOAD_PRESET = 'cactus-kids';
 const FIRESTORE_BASE = 'https://firestore.googleapis.com/v1/projects/cactus-kids-da0b0/databases/(default)/documents';
 const API_KEY = 'AIzaSyB4MzBpmDKzcQdf7FOjdMQL0Yh8n6QOF6w';
@@ -216,6 +272,7 @@ async function enviarSolicitud() {
   const laboral = document.getElementById('s-laboral').value;
   const monto = document.getElementById('s-monto').value;
 
+  if (dniYaExiste) { alert('Este DNI ya tiene una cuenta o solicitud pendiente. Contactanos directamente.'); return; }
   if (!nombre||!apellido) { alert('Completá nombre y apellido'); return; }
   if (!dni||dni.length<7) { alert('Ingresá un DNI válido'); return; }
   if (!fnac) { alert('Ingresá tu fecha de nacimiento'); return; }
