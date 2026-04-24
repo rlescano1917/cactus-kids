@@ -1708,34 +1708,72 @@ window.editarUsuario = function(id) {
   if (!u) return;
   const activo = u.activo !== 'false';
   abrirModal('<h3>Editar usuario</h3>'
-    + '<div class="mf"><span>Email</span>'+u.email+'</div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Email</label><input id="eu-email" type="email" value="'+u.email+'" style="width:100%"></div></div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Nombre</label><input id="eu-nombre" type="text" value="'+(u.nombre||'')+'" placeholder="Nombre completo" style="width:100%"></div></div>'
     + '<div class="fg full" style="margin-bottom:12px"><div><label>Rol</label>'
     + '<select id="eu-rol" style="width:100%">'
     + '<option value="colaboradora"'+(u.rol==='colaboradora'?' selected':'')+'>Colaboradora</option>'
     + '<option value="admin"'+(u.rol==='admin'?' selected':'')+'>Admin</option>'
     + '</select></div></div>'
     + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem">'
-    + '<label style="font-size:13px">Estado de la cuenta:</label>'
+    + '<label style="font-size:13px">Estado:</label>'
     + '<select id="eu-activo" style="font-size:14px;padding:6px 10px;border:0.5px solid #d3d1c7;border-radius:8px">'
     + '<option value="true"'+(activo?' selected':'')+'>Activa</option>'
     + '<option value="false"'+(!activo?' selected':'')+'>Desactivada</option>'
     + '</select></div>'
-    + '<div class="mactions"><button class="btn-save" style="flex:2" onclick="guardarEdicionUsuario(this.dataset.id)" data-id="'+id+'">Guardar cambios</button><button class="btn-close" onclick="cerrarModal()">Cancelar</button></div>');
+    + '<div id="eu-msg" style="font-size:13px;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:none"></div>'
+    + '<div class="mactions">'
+    + '<button class="btn-save" style="flex:2" onclick="guardarEdicionUsuario(this.dataset.id)" data-id="'+id+'">Guardar cambios</button>'
+    + '<button style="flex:1;padding:8px;font-size:13px;background:#e6f1fb;color:#185fa5;border:0.5px solid #85b7eb;border-radius:8px;cursor:pointer" onclick="reenviarInvitacion(this.dataset.id)" data-id="'+id+'">Reenviar invitacion</button>'
+    + '<button class="btn-close" onclick="cerrarModal()">Cancelar</button>'
+    + '</div>');
 };
 
 window.guardarEdicionUsuario = async function(id) {
   const u = usuariosDB.find(x=>x.id===id);
   if (!u) return;
+  const nuevoEmail = document.getElementById('eu-email').value.trim().toLowerCase();
+  const nuevoNombre = document.getElementById('eu-nombre').value.trim();
   const nuevoRol = document.getElementById('eu-rol').value;
   const nuevoActivo = document.getElementById('eu-activo').value;
+  const msg = document.getElementById('eu-msg');
+
+  if (!nuevoEmail) { msg.textContent='El email es obligatorio'; msg.style.display='block'; msg.style.color='#a32d2d'; msg.style.background='#fcebeb'; return; }
+
   try {
-    await fsPatch('usuarios', id, {rol:nuevoRol, activo:nuevoActivo});
-    u.rol = nuevoRol; u.activo = nuevoActivo;
-    logAccion('usuario', 'editar', u.email+' → rol:'+nuevoRol+' activo:'+nuevoActivo);
+    await fsPatch('usuarios', id, {email:nuevoEmail, nombre:nuevoNombre, rol:nuevoRol, activo:nuevoActivo});
+    u.email = nuevoEmail; u.nombre = nuevoNombre; u.rol = nuevoRol; u.activo = nuevoActivo;
+    logAccion('usuario', 'editar', nuevoEmail+' → rol:'+nuevoRol+' activo:'+nuevoActivo);
     toast('Usuario actualizado!', 'ok');
     cerrarModal();
     renderUsuarios();
   } catch(e) { toast('Error al actualizar', 'err'); }
+};
+
+window.reenviarInvitacion = async function(id) {
+  const u = usuariosDB.find(x=>x.id===id);
+  if (!u) return;
+  const msg = document.getElementById('eu-msg');
+  try {
+    const API_KEY_FB = 'AIzaSyB4MzBpmDKzcQdf7FOjdMQL0Yh8n6QOF6w';
+    const resp = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key='+API_KEY_FB, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({requestType: 'PASSWORD_RESET', email: u.email})
+    });
+    const data = await resp.json();
+    if (data.error) {
+      msg.textContent = 'Error: ' + data.error.message;
+      msg.style.color = '#a32d2d';
+      msg.style.background = '#fcebeb';
+    } else {
+      msg.textContent = '✓ Email enviado a ' + u.email;
+      msg.style.color = '#085041';
+      msg.style.background = '#e1f5ee';
+    }
+    msg.style.display = 'block';
+    logAccion('usuario', 'reenviar invitacion', u.email);
+  } catch(e) { toast('Error al enviar email', 'err'); }
 };
 
 // ==================== ESTADÍSTICAS ====================
