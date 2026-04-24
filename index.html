@@ -155,6 +155,7 @@ textarea{height:60px;resize:vertical}
     <button class="nav-mod" id="nav-auditoria" onclick="cambiarMod('auditoria')" style="display:none">Auditoria</button>
     <button class="nav-mod" id="nav-solicitudes" onclick="cambiarMod('solicitudes')" style="display:none">Solicitudes</button>
     <button class="nav-mod" id="nav-stats" onclick="cambiarMod('stats')">Estadisticas</button>
+    <button class="nav-mod" id="nav-usuarios" onclick="cambiarMod('usuarios')" style="display:none">Usuarios</button>
   </div>
 
   <!-- CLIENTES -->
@@ -412,7 +413,17 @@ textarea{height:60px;resize:vertical}
 
   
   
-  <!-- ESTADISTICAS -->
+  
+  <!-- PANEL DE USUARIOS -->
+  <div class="modulo" id="mod-usuarios">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <h3 style="font-size:16px;font-weight:500">Gestion de usuarios</h3>
+      <button class="btn-add" onclick="abrirNuevoUsuario()">+ Agregar usuario</button>
+    </div>
+    <div id="lista-usuarios"><div style="text-align:center;padding:2rem;color:#5f5e5a;font-size:14px">Cargando...</div></div>
+  </div>
+
+<!-- ESTADISTICAS -->
   <div class="modulo" id="mod-stats">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
       <h3 style="font-size:16px;font-weight:500">Estadisticas</h3>
@@ -497,7 +508,7 @@ function aplicarRoles(user) {
   rolActual = esAdmin ? 'admin' : 'colaboradora';
 
   // Módulos solo para admin
-  ['nav-auditoria','nav-solicitudes','nav-stats'].forEach(id => {
+  ['nav-auditoria','nav-solicitudes','nav-stats','nav-usuarios'].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.style.display = esAdmin ? '' : 'none';
   });
@@ -519,11 +530,17 @@ function aplicarRoles(user) {
   }
 }
 
-onAuthStateChanged(auth, user => {
+onAuthStateChanged(auth, async user => {
   if (user) {
     document.getElementById('login-screen').style.display='none';
     document.getElementById('main-app').style.display='block';
-    aplicarRoles(user);
+    // Registrar usuario y obtener rol desde Firestore
+    await registrarUsuarioActual(user);
+    const rolDB = await obtenerRolDesdeDB(user.email);
+    if (rolDB === null) return; // cuenta desactivada
+    // Sobrescribir rol con el de la DB
+    const userConRol = {...user, displayName: rolDB};
+    aplicarRoles(userConRol);
     initData();
   } else {
     document.getElementById('login-screen').style.display='flex';
@@ -612,9 +629,9 @@ function limpiarTel(t){return(t||'').replace(/[^0-9]/g,'');}
 
 // NAVEGACION
 window.cambiarMod=function(m){
-  const modulosAdmin=['auditoria','solicitudes','stats'];
+  const modulosAdmin=['auditoria','solicitudes','stats','usuarios'];
   if(modulosAdmin.includes(m)&&rolActual!=='admin'){toast('Acceso restringido a administradores','err');return;}
-  ['clientes','ventas','cuentas','gastos','auditoria','solicitudes','stats'].forEach(x=>{document.getElementById('mod-'+x).classList.toggle('active',m===x);const nav=document.getElementById('nav-'+x);if(nav)nav.classList.toggle('active',m===x);});if(m==='gastos')renderResumenGastos();if(m==='auditoria')cargarAuditoria();if(m==='solicitudes')cargarSolicitudes();if(m==='stats')renderStats();};
+  ['clientes','ventas','cuentas','gastos','auditoria','solicitudes','stats','usuarios'].forEach(x=>{document.getElementById('mod-'+x).classList.toggle('active',m===x);const nav=document.getElementById('nav-'+x);if(nav)nav.classList.toggle('active',m===x);});if(m==='gastos')renderResumenGastos();if(m==='auditoria')cargarAuditoria();if(m==='solicitudes')cargarSolicitudes();if(m==='stats')renderStats();if(m==='usuarios')cargarUsuarios();};
 window.showTabCl=function(t){['cl','cn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-cl-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderClientes();};
 window.showTabV=function(t){['vl','vn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-v-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderVentas();if(t==='nuevo')document.getElementById('v-fecha').value=new Date().toISOString().slice(0,10);};
 window.showTabCC=function(t){['ccl','ccn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-cc-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderCuentas();};
@@ -1522,6 +1539,155 @@ function pedirMotivo(mensaje) {
 }
 
 
+
+
+// ==================== GESTIÓN DE USUARIOS Y ROLES ====================
+let usuariosDB = [];
+
+// Al iniciar, registrar/actualizar el usuario actual en Firestore
+async function registrarUsuarioActual(user) {
+  try {
+    const todos = await fsGet('usuarios');
+    const existe = todos.find(u => u.email === user.email);
+    if (!existe) {
+      // Nuevo usuario - registrar con rol colaboradora por defecto
+      // Admin tiene rol admin automáticamente
+      const rol = user.email === 'rlescano1917@gmail.com' ? 'admin' : 'colaboradora';
+      await fsAdd('usuarios', {
+        email: user.email,
+        rol,
+        activo: 'true',
+        fechaAlta: new Date().toISOString(),
+        ultimoAcceso: new Date().toISOString()
+      });
+    } else {
+      // Actualizar último acceso
+      await fsPatch('usuarios', existe.id, {
+        ultimoAcceso: new Date().toISOString(),
+        activo: existe.activo||'true'
+      });
+    }
+  } catch(e) {
+    console.warn('Error al registrar usuario:', e);
+  }
+}
+
+// Obtener rol desde Firestore
+async function obtenerRolDesdeDB(email) {
+  try {
+    const todos = await fsGet('usuarios');
+    const usuario = todos.find(u => u.email === email);
+    if (usuario) {
+      // Verificar si está activo
+      if (usuario.activo === 'false') {
+        await signOut(auth);
+        alert('Tu cuenta fue desactivada. Contactá al administrador.');
+        return null;
+      }
+      return usuario.rol || 'colaboradora';
+    }
+    return email === 'rlescano1917@gmail.com' ? 'admin' : 'colaboradora';
+  } catch(e) {
+    return email === 'rlescano1917@gmail.com' ? 'admin' : 'colaboradora';
+  }
+}
+
+async function cargarUsuarios() {
+  const el = document.getElementById('lista-usuarios');
+  try {
+    usuariosDB = await fsGet('usuarios');
+    usuariosDB.sort((a,b) => {
+      if(a.rol==='admin') return -1;
+      if(b.rol==='admin') return 1;
+      return (a.email||'').localeCompare(b.email||'');
+    });
+    renderUsuarios();
+  } catch(e) {
+    if(el) el.innerHTML = '<div style="text-align:center;padding:2rem;color:#a32d2d;font-size:14px">Error al cargar usuarios.</div>';
+  }
+}
+
+function renderUsuarios() {
+  const el = document.getElementById('lista-usuarios');
+  if (!el) return;
+  if (!usuariosDB.length) {
+    el.innerHTML = '<div style="text-align:center;padding:2rem;color:#5f5e5a;font-size:14px">No hay usuarios registrados.</div>';
+    return;
+  }
+  el.innerHTML = usuariosDB.map(u => {
+    const esAdmin = u.rol === 'admin';
+    const activo = u.activo !== 'false';
+    const ultimoAcceso = u.ultimoAcceso ? new Date(u.ultimoAcceso).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+    const esSelf = u.email === 'rlescano1917@gmail.com';
+    return '<div class="row" style="'+(activo?'':'opacity:0.6;background:#f9f9f9')+'">'
+      + '<div class="avatar" style="background:'+(esAdmin?'#1a1a18':'#e6f1fb')+';color:'+(esAdmin?'#fff':'#185fa5')+';font-size:12px">'+(esAdmin?'ADM':'COL')+'</div>'
+      + '<div class="info"><strong>'+u.email+'</strong>'
+      + '<span>Ultimo acceso: '+ultimoAcceso+'</span></div>'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-shrink:0">'
+      + '<span class="badge" style="background:'+(esAdmin?'#1a1a18':'#e6f1fb')+';color:'+(esAdmin?'#fff':'#185fa5')+';border-color:'+(esAdmin?'#1a1a18':'#85b7eb')+'">'+(esAdmin?'Admin':'Colaboradora')+'</span>'
+      + (!esSelf ? '<button onclick="editarUsuario(this.dataset.id)" data-id="'+u.id+'" style="font-size:12px;padding:4px 10px;border:0.5px solid #d3d1c7;border-radius:6px;background:#fff;cursor:pointer">Editar</button>' : '')
+      + '</div></div>';
+  }).join('');
+}
+
+window.abrirNuevoUsuario = function() {
+  abrirModal('<h3>Agregar usuario</h3>'
+    + '<div style="background:#e6f1fb;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:13px;color:#185fa5">Primero creá el usuario en Firebase Authentication con su email y contraseña. Luego registralo acá para asignarle el rol.</div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Email *</label><input id="nu-email" type="email" placeholder="colaboradora@gmail.com" style="width:100%"></div></div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Rol *</label>'
+    + '<select id="nu-rol" style="width:100%"><option value="colaboradora">Colaboradora</option><option value="admin">Admin</option></select></div></div>'
+    + '<div class="mactions"><button class="btn-save" style="flex:2" onclick="guardarNuevoUsuario()">Guardar</button><button class="btn-close" onclick="cerrarModal()">Cancelar</button></div>');
+};
+
+window.guardarNuevoUsuario = async function() {
+  const email = document.getElementById('nu-email').value.trim().toLowerCase();
+  const rol = document.getElementById('nu-rol').value;
+  if (!email) { toast('Ingresá un email', 'err'); return; }
+  if (usuariosDB.find(u => u.email === email)) { toast('Este email ya está registrado', 'err'); return; }
+  try {
+    const doc = await fsAdd('usuarios', {email, rol, activo:'true', fechaAlta:new Date().toISOString(), ultimoAcceso:''});
+    usuariosDB.push(doc);
+    logAccion('usuario', 'crear', email+' como '+rol);
+    toast('Usuario registrado!', 'ok');
+    cerrarModal();
+    renderUsuarios();
+  } catch(e) { toast('Error al guardar', 'err'); }
+};
+
+window.editarUsuario = function(id) {
+  const u = usuariosDB.find(x=>x.id===id);
+  if (!u) return;
+  const activo = u.activo !== 'false';
+  abrirModal('<h3>Editar usuario</h3>'
+    + '<div class="mf"><span>Email</span>'+u.email+'</div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Rol</label>'
+    + '<select id="eu-rol" style="width:100%">'
+    + '<option value="colaboradora"'+(u.rol==='colaboradora'?' selected':'')+'>Colaboradora</option>'
+    + '<option value="admin"'+(u.rol==='admin'?' selected':'')+'>Admin</option>'
+    + '</select></div></div>'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem">'
+    + '<label style="font-size:13px">Estado de la cuenta:</label>'
+    + '<select id="eu-activo" style="font-size:14px;padding:6px 10px;border:0.5px solid #d3d1c7;border-radius:8px">'
+    + '<option value="true"'+(activo?' selected':'')+'>Activa</option>'
+    + '<option value="false"'+(!activo?' selected':'')+'>Desactivada</option>'
+    + '</select></div>'
+    + '<div class="mactions"><button class="btn-save" style="flex:2" onclick="guardarEdicionUsuario(this.dataset.id)" data-id="'+id+'">Guardar cambios</button><button class="btn-close" onclick="cerrarModal()">Cancelar</button></div>');
+};
+
+window.guardarEdicionUsuario = async function(id) {
+  const u = usuariosDB.find(x=>x.id===id);
+  if (!u) return;
+  const nuevoRol = document.getElementById('eu-rol').value;
+  const nuevoActivo = document.getElementById('eu-activo').value;
+  try {
+    await fsPatch('usuarios', id, {rol:nuevoRol, activo:nuevoActivo});
+    u.rol = nuevoRol; u.activo = nuevoActivo;
+    logAccion('usuario', 'editar', u.email+' → rol:'+nuevoRol+' activo:'+nuevoActivo);
+    toast('Usuario actualizado!', 'ok');
+    cerrarModal();
+    renderUsuarios();
+  } catch(e) { toast('Error al actualizar', 'err'); }
+};
 
 // ==================== ESTADÍSTICAS ====================
 function renderStats() {
