@@ -796,6 +796,12 @@ window.setModalidad=function(m){
   document.getElementById('mod-unico').style.background=m==='unico'?'#fcebeb':'#fff';
   document.getElementById('mod-cuotas').style.background=m==='cuotas'?'#fcebeb':'#fff';
   if(m==='cuotas')generarCuotas();
+  if(m==='unico'){
+    const d = new Date();
+    d.setDate(d.getDate()+30);
+    const venc = document.getElementById('v-vencimiento');
+    if(venc) venc.value = d.toISOString().slice(0,10);
+  }
 };
 
 window.generarCuotas=function(){
