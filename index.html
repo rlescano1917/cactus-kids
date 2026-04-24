@@ -1632,26 +1632,62 @@ function renderUsuarios() {
 
 window.abrirNuevoUsuario = function() {
   abrirModal('<h3>Agregar usuario</h3>'
-    + '<div style="background:#e6f1fb;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:13px;color:#185fa5">Primero creá el usuario en Firebase Authentication con su email y contraseña. Luego registralo acá para asignarle el rol.</div>'
     + '<div class="fg full" style="margin-bottom:12px"><div><label>Email *</label><input id="nu-email" type="email" placeholder="colaboradora@gmail.com" style="width:100%"></div></div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Contrasena *</label><input id="nu-pass" type="password" placeholder="minimo 6 caracteres" style="width:100%"></div></div>'
     + '<div class="fg full" style="margin-bottom:12px"><div><label>Rol *</label>'
     + '<select id="nu-rol" style="width:100%"><option value="colaboradora">Colaboradora</option><option value="admin">Admin</option></select></div></div>'
-    + '<div class="mactions"><button class="btn-save" style="flex:2" onclick="guardarNuevoUsuario()">Guardar</button><button class="btn-close" onclick="cerrarModal()">Cancelar</button></div>');
+    + '<div id="nu-error" style="font-size:13px;color:#a32d2d;background:#fcebeb;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:none"></div>'
+    + '<div class="mactions"><button class="btn-save" style="flex:2" id="nu-btn" onclick="guardarNuevoUsuario()">Crear usuario</button><button class="btn-close" onclick="cerrarModal()">Cancelar</button></div>');
 };
 
 window.guardarNuevoUsuario = async function() {
   const email = document.getElementById('nu-email').value.trim().toLowerCase();
+  const pass = document.getElementById('nu-pass').value;
   const rol = document.getElementById('nu-rol').value;
-  if (!email) { toast('Ingresá un email', 'err'); return; }
-  if (usuariosDB.find(u => u.email === email)) { toast('Este email ya está registrado', 'err'); return; }
+  const errEl = document.getElementById('nu-error');
+  const btn = document.getElementById('nu-btn');
+  errEl.style.display = 'none';
+
+  if (!email) { errEl.textContent='Ingresá un email'; errEl.style.display='block'; return; }
+  if (!pass || pass.length < 6) { errEl.textContent='La contraseña debe tener al menos 6 caracteres'; errEl.style.display='block'; return; }
+  if (usuariosDB.find(u => u.email === email)) { errEl.textContent='Este email ya está registrado'; errEl.style.display='block'; return; }
+
+  btn.disabled = true; btn.textContent = 'Creando...';
+
   try {
+    // Crear usuario en Firebase Authentication via REST API
+    const API_KEY_FB = 'AIzaSyB4MzBpmDKzcQdf7FOjdMQL0Yh8n6QOF6w';
+    const resp = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key='+API_KEY_FB, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email, password: pass, returnSecureToken: false})
+    });
+    const data = await resp.json();
+
+    if (data.error) {
+      const errores = {
+        'EMAIL_EXISTS': 'Este email ya tiene una cuenta en Firebase.',
+        'INVALID_EMAIL': 'El email no es válido.',
+        'WEAK_PASSWORD': 'La contraseña es muy débil.',
+      };
+      errEl.textContent = errores[data.error.message] || data.error.message;
+      errEl.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'Crear usuario';
+      return;
+    }
+
+    // Guardar en Firestore con el rol
     const doc = await fsAdd('usuarios', {email, rol, activo:'true', fechaAlta:new Date().toISOString(), ultimoAcceso:''});
     usuariosDB.push(doc);
     logAccion('usuario', 'crear', email+' como '+rol);
-    toast('Usuario registrado!', 'ok');
+    toast('Usuario creado exitosamente!', 'ok');
     cerrarModal();
     renderUsuarios();
-  } catch(e) { toast('Error al guardar', 'err'); }
+  } catch(e) {
+    errEl.textContent = 'Error al crear el usuario. Intentá de nuevo.';
+    errEl.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Crear usuario';
+  }
 };
 
 window.editarUsuario = function(id) {
