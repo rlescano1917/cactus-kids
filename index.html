@@ -486,16 +486,44 @@ let cliSelVId=null, cliSelVNombre='';
 let cliSelCCId=null, cliSelCCNombre='';
 let pagoSel=null, modalidadFiado='unico';
 
+// ROLES: el Display Name en Firebase determina el rol
+// Admin: displayName = 'admin' O email = rlescano1917@gmail.com
+// Colaboradora: displayName = 'colaboradora' o cualquier otro valor
+
+let rolActual = 'colaboradora'; // por defecto
+
+function aplicarRoles(user) {
+  const esAdmin = user.email === 'rlescano1917@gmail.com' || user.displayName === 'admin';
+  rolActual = esAdmin ? 'admin' : 'colaboradora';
+
+  // Módulos solo para admin
+  ['nav-auditoria','nav-solicitudes','nav-stats'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.style.display = esAdmin ? '' : 'none';
+  });
+
+  // Gastos: colaboradora solo puede registrar, no ver lista
+  // Lo manejamos ocultando la tab "Ver gastos"
+  const tabGlista = document.getElementById('tab-gl');
+  if(tabGlista) tabGlista.style.display = esAdmin ? '' : 'none';
+
+  // Mostrar badge de rol
+  document.getElementById('usuario-text').textContent = user.email + (esAdmin ? ' (admin)' : ' (colaboradora)');
+
+  // Si es colaboradora y está en una tab restringida, redirigir
+  if(!esAdmin) {
+    // Ocultar botón eliminar cliente (solo admin puede eliminar)
+    window._puedeEliminar = false;
+  } else {
+    window._puedeEliminar = true;
+  }
+}
+
 onAuthStateChanged(auth, user => {
   if (user) {
     document.getElementById('login-screen').style.display='none';
     document.getElementById('main-app').style.display='block';
-    document.getElementById('usuario-text').textContent=user.email;
-    // Mostrar auditoría solo para admin
-    if(user.email==='rlescano1917@gmail.com'){
-      document.getElementById('nav-auditoria').style.display='';
-      document.getElementById('nav-solicitudes').style.display='';
-    }
+    aplicarRoles(user);
     initData();
   } else {
     document.getElementById('login-screen').style.display='flex';
@@ -583,7 +611,10 @@ function val(v){return v&&String(v).trim()?v:'—';}
 function limpiarTel(t){return(t||'').replace(/[^0-9]/g,'');}
 
 // NAVEGACION
-window.cambiarMod=function(m){['clientes','ventas','cuentas','gastos','auditoria','solicitudes','stats'].forEach(x=>{document.getElementById('mod-'+x).classList.toggle('active',m===x);const nav=document.getElementById('nav-'+x);if(nav)nav.classList.toggle('active',m===x);});if(m==='gastos')renderResumenGastos();if(m==='auditoria')cargarAuditoria();if(m==='solicitudes')cargarSolicitudes();if(m==='stats')renderStats();};
+window.cambiarMod=function(m){
+  const modulosAdmin=['auditoria','solicitudes','stats'];
+  if(modulosAdmin.includes(m)&&rolActual!=='admin'){toast('Acceso restringido a administradores','err');return;}
+  ['clientes','ventas','cuentas','gastos','auditoria','solicitudes','stats'].forEach(x=>{document.getElementById('mod-'+x).classList.toggle('active',m===x);const nav=document.getElementById('nav-'+x);if(nav)nav.classList.toggle('active',m===x);});if(m==='gastos')renderResumenGastos();if(m==='auditoria')cargarAuditoria();if(m==='solicitudes')cargarSolicitudes();if(m==='stats')renderStats();};
 window.showTabCl=function(t){['cl','cn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-cl-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderClientes();};
 window.showTabV=function(t){['vl','vn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-v-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderVentas();if(t==='nuevo')document.getElementById('v-fecha').value=new Date().toISOString().slice(0,10);};
 window.showTabCC=function(t){['ccl','ccn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-cc-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderCuentas();};
@@ -735,6 +766,7 @@ window.guardarEdicion=async function(id){
 };
 
 window.eliminarCliente=async function(id){
+  if(rolActual!=='admin'){toast('Solo el administrador puede eliminar clientes','err');return;}
   const cliDel=clientes.find(c=>c.id===id);
   const motivo=await pedirMotivo('Vas a eliminar a '+( cliDel?.nombre||'')+' '+(cliDel?.apellido||''));
   if(!motivo)return;
@@ -889,6 +921,7 @@ window.verVenta=function(id){
   abrirModal('<h3>Venta a '+v.clienteNombre+'</h3>'+'<div class="mf"><span>Fecha</span>'+val(v.fecha)+'</div>'+'<div class="mf"><span>Forma de pago</span>'+(v.formaPago||'—')+'</div>'+(v.ajuste?'<div class="mf"><span>Ajuste</span>'+v.ajuste+'</div>':'')+'<div class="mf"><span>Productos</span>'+prods+'</div>'+'<div style="background:#1a1a18;border-radius:8px;padding:0.75rem 1rem;margin:0.75rem 0;display:flex;justify-content:space-between;align-items:center"><span style="color:#f1efe8;font-size:14px">Total</span><span style="color:#fff;font-size:18px;font-weight:500">'+fmt(v.total||0)+'</span></div>'+'<div class="mf"><span>Notas</span>'+val(v.notas)+'</div>'+'<div class="mactions"><button class="btn-del" onclick="eliminarVenta(\''+v.id+'\')">Eliminar</button><button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>');
 };
 window.eliminarVenta=async function(id){
+  if(rolActual!=='admin'){toast('Solo el administrador puede eliminar ventas','err');return;}
   const ventaDel=ventas.find(v=>v.id===id);
   const motivo=await pedirMotivo('Vas a eliminar una venta de '+(ventaDel?.clienteNombre||'')+' por '+fmt(ventaDel?.total||0));
   if(!motivo)return;
@@ -1010,6 +1043,7 @@ window.agregarMov=async function(cuentaId,tipo){
 };
 
 window.eliminarMov=async function(cuentaId,movId){
+  if(rolActual!=='admin'){toast('Solo el administrador puede eliminar movimientos','err');return;}
   const cuentaMov=cuentas.find(x=>x.id===cuentaId);
   const movDel=(cuentaMov?.movimientos||[]).find(m=>m.id===movId);
   const motivo=await pedirMotivo('Vas a eliminar un '+(movDel?.tipo||'movimiento')+' de '+fmt(movDel?.monto||0)+' de '+(cuentaMov?.clienteNombre||''));
