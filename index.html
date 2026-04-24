@@ -1678,11 +1678,12 @@ window.guardarNuevoUsuario = async function() {
   try {
     const API_KEY_FB = 'AIzaSyB4MzBpmDKzcQdf7FOjdMQL0Yh8n6QOF6w';
 
-    // 1. Crear usuario con contraseña temporal
+    // Crear usuario usando el token del admin (bypassa la restricción de registro)
     const passTemp = 'CactusKids'+Math.random().toString(36).slice(2,8)+'!';
+    const tk = await getToken();
     const resp = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key='+API_KEY_FB, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', ...(tk?{Authorization:'Bearer '+tk}:{})},
       body: JSON.stringify({email, password: passTemp, returnSecureToken: false})
     });
     const data = await resp.json();
@@ -1690,20 +1691,15 @@ window.guardarNuevoUsuario = async function() {
     if (data.error) {
       const errores = {
         'EMAIL_EXISTS': 'Este email ya tiene una cuenta.',
-        'INVALID_EMAIL': 'El email no es válido.',
+        'INVALID_EMAIL': 'El email no es valido.',
+        'ADMIN_ONLY_OPERATION': 'El registro esta desactivado. Contacta a soporte.',
+        'OPERATION_NOT_ALLOWED': 'El registro esta desactivado. Contacta a soporte.',
       };
       errEl.textContent = errores[data.error.message] || ('Error: ' + data.error.message);
       errEl.style.display = 'block';
       btn.disabled = false; btn.textContent = 'Crear y enviar invitacion';
       return;
     }
-
-    // 2. Enviar email de restablecimiento de contraseña
-    await fetch('https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key='+API_KEY_FB, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({requestType: 'PASSWORD_RESET', email})
-    });
 
     // 3. Guardar en Firestore con rol
     const doc = await fsAdd('usuarios', {
