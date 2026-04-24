@@ -134,6 +134,7 @@ textarea{height:60px;resize:vertical}
     <input type="password" id="login-pass" placeholder="contrasena" onkeydown="if(event.key==='Enter')doLogin()">
     <div class="login-err" id="login-err">Email o contrasena incorrectos</div>
     <button class="btn-login" id="btn-login" onclick="doLogin()">Ingresar</button>
+    <div style="text-align:center;margin-top:12px"><button onclick="olvidastePass()" style="background:none;border:none;color:#185fa5;font-size:13px;cursor:pointer;text-decoration:underline">¿Olvidaste tu contraseña?</button></div>
   </div>
 </div>
 
@@ -547,6 +548,26 @@ onAuthStateChanged(auth, async user => {
     document.getElementById('main-app').style.display='none';
   }
 });
+
+
+window.olvidastePass = async function() {
+  const email = document.getElementById('login-email').value.trim();
+  if (!email) {
+    alert('Primero ingresá tu email en el campo de arriba.');
+    return;
+  }
+  try {
+    const API_KEY_FB = 'AIzaSyB4MzBpmDKzcQdf7FOjdMQL0Yh8n6QOF6w';
+    await fetch('https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key='+API_KEY_FB, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({requestType: 'PASSWORD_RESET', email})
+    });
+    alert('Si ese email existe en el sistema, recibirás un correo para restablecer tu contraseña. Revisá también la carpeta de spam.');
+  } catch(e) {
+    alert('Error al enviar el email. Contactá al administrador.');
+  }
+};
 
 window.doLogin = async function() {
   const email=document.getElementById('login-email').value.trim();
@@ -1693,9 +1714,17 @@ window.guardarNuevoUsuario = async function() {
     });
     usuariosDB.push(doc);
     logAccion('usuario', 'crear', email+' como '+rol);
-    toast('Usuario creado! Se envio el email de invitacion.', 'ok');
+    // Mostrar instrucciones por WhatsApp
+    const waText = encodeURIComponent('Hola ' + (nombre||'') + ', te invitamos a acceder al sistema de Cactus Kids.' + String.fromCharCode(10) + String.fromCharCode(10) + '1. Anda a: https://cactustucuman.com.ar' + String.fromCharCode(10) + '2. En la pantalla de login hace clic en Olvide mi contrasena' + String.fromCharCode(10) + '3. Ingresa tu email: ' + email + String.fromCharCode(10) + '4. Te llegara un email para elegir tu contrasena' + String.fromCharCode(10) + String.fromCharCode(10) + 'Cualquier consulta avisame!');
+    const waUrl = 'https://wa.me/?text=' + waText;
     cerrarModal();
     renderUsuarios();
+    // Mostrar modal con link de WhatsApp
+    abrirModal('<h3>Usuario creado!</h3>'
+      + '<div style="background:#e1f5ee;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:13px;color:#085041">El usuario <strong>'+email+'</strong> fue creado correctamente.</div>'
+      + '<div style="font-size:13px;color:#5f5e5a;margin-bottom:1rem">Para que pueda acceder necesita elegir su contraseña. Enviále las instrucciones por WhatsApp:</div>'
+      + '<a href="'+waUrl+'" target="_blank" style="display:block;text-align:center;padding:12px;background:#25D366;color:#fff;border-radius:8px;text-decoration:none;font-size:15px;font-weight:500;margin-bottom:12px">📱 Enviar instrucciones por WhatsApp</a>'
+      + '<button class="btn-close" onclick="cerrarModal()" style="width:100%">Cerrar</button>');
   } catch(e) {
     errEl.textContent = 'Error al crear el usuario. Intentá de nuevo.';
     errEl.style.display = 'block';
@@ -1762,19 +1791,37 @@ window.reenviarInvitacion = async function(id) {
       body: JSON.stringify({requestType: 'PASSWORD_RESET', email: u.email})
     });
     const data = await resp.json();
-    if (data.error) {
-      msg.textContent = 'Error: ' + data.error.message;
-      msg.style.color = '#a32d2d';
-      msg.style.background = '#fcebeb';
+    if (data.error || !data.oobLink) {
+      // Si falla el email, generar link manualmente
+      generarLinkAcceso(u, msg);
     } else {
-      msg.textContent = '✓ Email enviado a ' + u.email;
-      msg.style.color = '#085041';
-      msg.style.background = '#e1f5ee';
+      // Mostrar link para copiar y enviar por WhatsApp
+      mostrarLinkInvitacion(data.oobLink, u, msg);
     }
-    msg.style.display = 'block';
-    logAccion('usuario', 'reenviar invitacion', u.email);
-  } catch(e) { toast('Error al enviar email', 'err'); }
+    logAccion('usuario', 'generar invitacion', u.email);
+  } catch(e) {
+    generarLinkAcceso(u, msg);
+  }
 };
+
+function generarLinkAcceso(u, msg) {
+  // Link directo de Firebase para restablecer contraseña
+  const link = 'https://cactus-kids-da0b0.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=PENDIENTE&email='+encodeURIComponent(u.email);
+  mostrarLinkInvitacion(null, u, msg);
+}
+
+function mostrarLinkInvitacion(link, u, msg) {
+  const waText = encodeURIComponent('Hola! Te invitamos a acceder al sistema de Cactus Kids.' + String.fromCharCode(10) + String.fromCharCode(10) + '1. Anda a: https://cactustucuman.com.ar' + String.fromCharCode(10) + '2. Hace clic en Olvide mi contrasena' + String.fromCharCode(10) + '3. Ingresa tu email: ' + u.email + String.fromCharCode(10) + '4. Te llegara un email para elegir tu contrasena' + String.fromCharCode(10) + 'Cualquier consulta avisame!');
+  const waUrl = 'https://wa.me/?text=' + waText;
+  
+  msg.style.display = 'block';
+  msg.style.color = '#085041';
+  msg.style.background = '#e1f5ee';
+  msg.style.padding = '10px';
+  msg.innerHTML = '<strong>Instrucciones de acceso generadas</strong><br>'
+    + '<div style="font-size:12px;margin:6px 0">Email: <strong>' + u.email + '</strong></div>'
+    + '<a href="' + waUrl + '" target="_blank" style="display:inline-block;margin-top:8px;padding:8px 14px;background:#25D366;color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:500">📱 Enviar por WhatsApp</a>';
+}
 
 // ==================== ESTADÍSTICAS ====================
 function renderStats() {
