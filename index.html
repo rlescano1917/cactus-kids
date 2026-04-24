@@ -128,8 +128,8 @@ textarea{height:60px;resize:vertical}
   <div class="login-box">
     <div class="login-logo">Cactus Kids</div>
     <div class="login-sub">Ingresa con tu cuenta</div>
-    <label style="font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px;margin-top:12px">Email</label>
-    <input type="email" id="login-email" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
+    <label style="font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px;margin-top:12px">Usuario o Email</label>
+    <input type="text" id="login-email" placeholder="usuario o email" onkeydown="if(event.key==='Enter')doLogin()" autocomplete="username">
     <label style="font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px;margin-top:12px">Contrasena</label>
     <input type="password" id="login-pass" placeholder="contrasena" onkeydown="if(event.key==='Enter')doLogin()">
     <div class="login-err" id="login-err">Email o contrasena incorrectos</div>
@@ -570,8 +570,10 @@ window.olvidastePass = async function() {
 };
 
 window.doLogin = async function() {
-  const email=document.getElementById('login-email').value.trim();
-  const pass=document.getElementById('login-pass').value;
+  let emailInput = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  // Si no tiene @ es un nombre de usuario, convertir a email interno
+  const email = emailInput.includes('@') ? emailInput : emailInput.toLowerCase().replace(/[^a-z0-9]/g,'') + '@cactuskids.interno';
   const err=document.getElementById('login-err');
   const btn=document.getElementById('btn-login');
   err.style.display='none'; btn.disabled=true; btn.textContent='Ingresando...';
@@ -1653,126 +1655,85 @@ function renderUsuarios() {
 
 window.abrirNuevoUsuario = function() {
   abrirModal('<h3>Agregar usuario</h3>'
-    + '<div style="background:#e1f5ee;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:13px;color:#085041">La colaboradora va a recibir un email para elegir su propia contraseña.</div>'
-    + '<div class="fg full" style="margin-bottom:12px"><div><label>Email *</label><input id="nu-email" type="email" placeholder="colaboradora@gmail.com" style="width:100%"></div></div>'
-    + '<div class="fg full" style="margin-bottom:12px"><div><label>Nombre</label><input id="nu-nombre" type="text" placeholder="Maria Gonzalez" style="width:100%"></div></div>'
+    + '<div style="background:#e6f1fb;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:13px;color:#185fa5">El sistema genera el acceso automaticamente. Vos le das los datos a la colaboradora.</div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Nombre de usuario * (sin espacios)</label><input id="nu-user" type="text" placeholder="ebanega" style="width:100%" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9]/g,\'\')"></div></div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Nombre completo</label><input id="nu-nombre" type="text" placeholder="Emilse Banega" style="width:100%"></div></div>'
     + '<div class="fg full" style="margin-bottom:12px"><div><label>Rol *</label>'
     + '<select id="nu-rol" style="width:100%"><option value="colaboradora">Colaboradora</option><option value="admin">Admin</option></select></div></div>'
     + '<div id="nu-error" style="font-size:13px;color:#a32d2d;background:#fcebeb;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:none"></div>'
-    + '<div class="mactions"><button class="btn-save" style="flex:2" id="nu-btn" onclick="guardarNuevoUsuario()">Crear y enviar invitacion</button><button class="btn-close" onclick="cerrarModal()">Cancelar</button></div>');
+    + '<div class="mactions"><button class="btn-save" style="flex:2" id="nu-btn" onclick="guardarNuevoUsuario()">Crear usuario</button><button class="btn-close" onclick="cerrarModal()">Cancelar</button></div>');
 };
 
 window.guardarNuevoUsuario = async function() {
-  const email = document.getElementById('nu-email').value.trim().toLowerCase();
+  const username = document.getElementById('nu-user').value.trim().toLowerCase();
   const nombre = document.getElementById('nu-nombre').value.trim();
   const rol = document.getElementById('nu-rol').value;
   const errEl = document.getElementById('nu-error');
   const btn = document.getElementById('nu-btn');
   errEl.style.display = 'none';
 
-  if (!email) { errEl.textContent='Ingresá un email'; errEl.style.display='block'; return; }
-  if (usuariosDB.find(u => u.email === email)) { errEl.textContent='Este email ya está registrado'; errEl.style.display='block'; return; }
+  if (!username || username.length < 3) { errEl.textContent='El nombre de usuario debe tener al menos 3 caracteres'; errEl.style.display='block'; return; }
+  if (usuariosDB.find(u => u.username === username)) { errEl.textContent='Ese nombre de usuario ya existe'; errEl.style.display='block'; return; }
 
   btn.disabled = true; btn.textContent = 'Creando...';
 
+  // Generar email interno y contraseña aleatoria
+  const email = username + '@cactuskids.interno';
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let pass = '';
+  for(let i=0;i<8;i++) pass += chars[Math.floor(Math.random()*chars.length)];
+
   try {
     const API_KEY_FB = 'AIzaSyB4MzBpmDKzcQdf7FOjdMQL0Yh8n6QOF6w';
-
-    // Crear usuario usando el token del admin (bypassa la restricción de registro)
-    const passTemp = 'CactusKids'+Math.random().toString(36).slice(2,8)+'!';
-    const tk = await getToken();
     const resp = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key='+API_KEY_FB, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json', ...(tk?{Authorization:'Bearer '+tk}:{})},
-      body: JSON.stringify({email, password: passTemp, returnSecureToken: false})
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email, password: pass, returnSecureToken: false})
     });
     const data = await resp.json();
 
     if (data.error) {
-      const errores = {
-        'EMAIL_EXISTS': 'Este email ya tiene una cuenta.',
-        'INVALID_EMAIL': 'El email no es valido.',
-        'ADMIN_ONLY_OPERATION': 'El registro esta desactivado. Contacta a soporte.',
-        'OPERATION_NOT_ALLOWED': 'El registro esta desactivado. Contacta a soporte.',
-      };
-      errEl.textContent = errores[data.error.message] || ('Error: ' + data.error.message);
+      errEl.textContent = 'Error: ' + data.error.message;
       errEl.style.display = 'block';
-      btn.disabled = false; btn.textContent = 'Crear y enviar invitacion';
+      btn.disabled = false; btn.textContent = 'Crear usuario';
       return;
     }
 
-    // 3. Guardar en Firestore con rol
+    // Guardar en Firestore con rol y username
     const doc = await fsAdd('usuarios', {
-      email, nombre: nombre||email, rol,
-      activo:'true',
+      email, username, nombre: nombre||username, rol,
+      activo: 'true',
       fechaAlta: new Date().toISOString(),
       ultimoAcceso: ''
     });
     usuariosDB.push(doc);
-    logAccion('usuario', 'crear', email+' como '+rol);
-    // Mostrar instrucciones por WhatsApp
-    const waText = encodeURIComponent('Hola ' + (nombre||'') + ', te invitamos a acceder al sistema de Cactus Kids.' + String.fromCharCode(10) + String.fromCharCode(10) + '1. Anda a: https://cactustucuman.com.ar' + String.fromCharCode(10) + '2. En la pantalla de login hace clic en Olvide mi contrasena' + String.fromCharCode(10) + '3. Ingresa tu email: ' + email + String.fromCharCode(10) + '4. Te llegara un email para elegir tu contrasena' + String.fromCharCode(10) + String.fromCharCode(10) + 'Cualquier consulta avisame!');
-    const waUrl = 'https://wa.me/?text=' + waText;
+    logAccion('usuario', 'crear', username+' como '+rol);
+
+    // Mostrar credenciales al admin
     cerrarModal();
     renderUsuarios();
-    // Mostrar modal con link de WhatsApp
     abrirModal('<h3>Usuario creado!</h3>'
-      + '<div style="background:#e1f5ee;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:13px;color:#085041">El usuario <strong>'+email+'</strong> fue creado correctamente.</div>'
-      + '<div style="font-size:13px;color:#5f5e5a;margin-bottom:1rem">Para que pueda acceder necesita elegir su contraseña. Enviále las instrucciones por WhatsApp:</div>'
-      + '<a href="'+waUrl+'" target="_blank" style="display:block;text-align:center;padding:12px;background:#25D366;color:#fff;border-radius:8px;text-decoration:none;font-size:15px;font-weight:500;margin-bottom:12px">📱 Enviar instrucciones por WhatsApp</a>'
-      + '<button class="btn-close" onclick="cerrarModal()" style="width:100%">Cerrar</button>');
+      + '<div style="background:#e1f5ee;border-radius:8px;padding:1rem;margin-bottom:1rem">'
+      + '<div style="font-size:12px;color:#5f5e5a;margin-bottom:4px">Nombre de usuario</div>'
+      + '<div style="font-size:20px;font-weight:500;color:#085041;margin-bottom:12px">'+username+'</div>'
+      + '<div style="font-size:12px;color:#5f5e5a;margin-bottom:4px">Contrasena</div>'
+      + '<div style="font-size:20px;font-weight:500;color:#085041;letter-spacing:2px">'+pass+'</div>'
+      + '</div>'
+      + '<div style="background:#faeeda;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:13px;color:#633806">⚠️ Anotá esta contraseña ahora. No se vuelve a mostrar.</div>'
+      + '<div style="display:flex;gap:8px">'
+      + '<button onclick="copiarCredenciales(this.dataset.u,this.dataset.p)" data-u="'+username+'" data-p="'+pass+'" style="flex:1;padding:9px;font-size:13px;background:#e6f1fb;color:#185fa5;border:0.5px solid #85b7eb;border-radius:8px;cursor:pointer">Copiar credenciales</button>'
+      + '<button class="btn-close" onclick="cerrarModal()" style="flex:1">Cerrar</button>'
+      + '</div>');
   } catch(e) {
     errEl.textContent = 'Error al crear el usuario. Intentá de nuevo.';
     errEl.style.display = 'block';
-    btn.disabled = false; btn.textContent = 'Crear y enviar invitacion';
+    btn.disabled = false; btn.textContent = 'Crear usuario';
   }
 };
 
-window.editarUsuario = function(id) {
-  const u = usuariosDB.find(x=>x.id===id);
-  if (!u) return;
-  const activo = u.activo !== 'false';
-  abrirModal('<h3>Editar usuario</h3>'
-    + '<div class="fg full" style="margin-bottom:12px"><div><label>Email</label><input id="eu-email" type="email" value="'+u.email+'" style="width:100%"></div></div>'
-    + '<div class="fg full" style="margin-bottom:12px"><div><label>Nombre</label><input id="eu-nombre" type="text" value="'+(u.nombre||'')+'" placeholder="Nombre completo" style="width:100%"></div></div>'
-    + '<div class="fg full" style="margin-bottom:12px"><div><label>Rol</label>'
-    + '<select id="eu-rol" style="width:100%">'
-    + '<option value="colaboradora"'+(u.rol==='colaboradora'?' selected':'')+'>Colaboradora</option>'
-    + '<option value="admin"'+(u.rol==='admin'?' selected':'')+'>Admin</option>'
-    + '</select></div></div>'
-    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem">'
-    + '<label style="font-size:13px">Estado:</label>'
-    + '<select id="eu-activo" style="font-size:14px;padding:6px 10px;border:0.5px solid #d3d1c7;border-radius:8px">'
-    + '<option value="true"'+(activo?' selected':'')+'>Activa</option>'
-    + '<option value="false"'+(!activo?' selected':'')+'>Desactivada</option>'
-    + '</select></div>'
-    + '<div id="eu-msg" style="font-size:13px;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:none"></div>'
-    + '<div class="mactions">'
-    + '<button class="btn-save" style="flex:2" onclick="guardarEdicionUsuario(this.dataset.id)" data-id="'+id+'">Guardar cambios</button>'
-    + '<button style="flex:1;padding:8px;font-size:13px;background:#e6f1fb;color:#185fa5;border:0.5px solid #85b7eb;border-radius:8px;cursor:pointer" onclick="reenviarInvitacion(this.dataset.id)" data-id="'+id+'">Reenviar invitacion</button>'
-    + '<button class="btn-close" onclick="cerrarModal()">Cancelar</button>'
-    + '</div>');
-};
-
-window.guardarEdicionUsuario = async function(id) {
-  const u = usuariosDB.find(x=>x.id===id);
-  if (!u) return;
-  const nuevoEmail = document.getElementById('eu-email').value.trim().toLowerCase();
-  const nuevoNombre = document.getElementById('eu-nombre').value.trim();
-  const nuevoRol = document.getElementById('eu-rol').value;
-  const nuevoActivo = document.getElementById('eu-activo').value;
-  const msg = document.getElementById('eu-msg');
-
-  if (!nuevoEmail) { msg.textContent='El email es obligatorio'; msg.style.display='block'; msg.style.color='#a32d2d'; msg.style.background='#fcebeb'; return; }
-
-  try {
-    await fsPatch('usuarios', id, {email:nuevoEmail, nombre:nuevoNombre, rol:nuevoRol, activo:nuevoActivo});
-    u.email = nuevoEmail; u.nombre = nuevoNombre; u.rol = nuevoRol; u.activo = nuevoActivo;
-    logAccion('usuario', 'editar', nuevoEmail+' → rol:'+nuevoRol+' activo:'+nuevoActivo);
-    toast('Usuario actualizado!', 'ok');
-    cerrarModal();
-    renderUsuarios();
-  } catch(e) { toast('Error al actualizar', 'err'); }
+window.copiarCredenciales = function(username, pass) {
+  const texto = 'Usuario: ' + username + '\nContrasena: ' + pass + '\nURL: https://cactustucuman.com.ar';
+  navigator.clipboard.writeText(texto).then(() => toast('Credenciales copiadas!','ok'));
 };
 
 window.reenviarInvitacion = async function(id) {
