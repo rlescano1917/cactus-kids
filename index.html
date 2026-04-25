@@ -128,8 +128,8 @@ textarea{height:60px;resize:vertical}
   <div class="login-box">
     <div class="login-logo">Cactus Kids</div>
     <div class="login-sub">Ingresa con tu cuenta</div>
-    <label style="font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px;margin-top:12px">Usuario o Email</label>
-    <input type="text" id="login-email" placeholder="usuario o email" onkeydown="if(event.key==='Enter')doLogin()" autocomplete="username">
+    <label style="font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px;margin-top:12px">Email</label>
+    <input type="email" id="login-email" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
     <label style="font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px;margin-top:12px">Contrasena</label>
     <input type="password" id="login-pass" placeholder="contrasena" onkeydown="if(event.key==='Enter')doLogin()">
     <div class="login-err" id="login-err">Email o contrasena incorrectos</div>
@@ -570,10 +570,8 @@ window.olvidastePass = async function() {
 };
 
 window.doLogin = async function() {
-  let emailInput = document.getElementById('login-email').value.trim();
+  const email = document.getElementById('login-email').value.trim();
   const pass = document.getElementById('login-pass').value;
-  // Si no tiene @ es un nombre de usuario, convertir a email interno
-  const email = emailInput.includes('@') ? emailInput : emailInput.toLowerCase().replace(/[^a-z0-9]/g,'') + '@cactuskids.interno';
   const err=document.getElementById('login-err');
   const btn=document.getElementById('btn-login');
   err.style.display='none'; btn.disabled=true; btn.textContent='Ingresando...';
@@ -1678,30 +1676,26 @@ function renderUsuarios() {
 
 window.abrirNuevoUsuario = function() {
   abrirModal('<h3>Agregar usuario</h3>'
-    + '<div style="background:#e6f1fb;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:13px;color:#185fa5">El sistema genera el acceso automaticamente. Vos le das los datos a la colaboradora.</div>'
-    + '<div class="fg full" style="margin-bottom:12px"><div><label>Nombre de usuario * (sin espacios)</label><input id="nu-user" type="text" placeholder="ebanega" style="width:100%" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9]/g,\'\')"></div></div>'
-    + '<div class="fg full" style="margin-bottom:12px"><div><label>Nombre completo</label><input id="nu-nombre" type="text" placeholder="Emilse Banega" style="width:100%"></div></div>'
-    + '<div class="fg full" style="margin-bottom:12px"><div><label>Rol *</label>'
-    + '<select id="nu-rol" style="width:100%"><option value="colaboradora">Colaboradora</option><option value="admin">Admin</option></select></div></div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Email *</label><input id="nu-email" type="email" placeholder="colaboradora@gmail.com" style="width:100%"></div></div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Nombre completo</label><input id="nu-nombre" type="text" placeholder="Maria Gonzalez" style="width:100%"></div></div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Rol *</label><select id="nu-rol" style="width:100%"><option value="colaboradora">Colaboradora</option><option value="admin">Admin</option></select></div></div>'
     + '<div id="nu-error" style="font-size:13px;color:#a32d2d;background:#fcebeb;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:none"></div>'
     + '<div class="mactions"><button class="btn-save" style="flex:2" id="nu-btn" onclick="guardarNuevoUsuario()">Crear usuario</button><button class="btn-close" onclick="cerrarModal()">Cancelar</button></div>');
 };
 
 window.guardarNuevoUsuario = async function() {
-  const username = document.getElementById('nu-user').value.trim().toLowerCase();
+  const email = document.getElementById('nu-email').value.trim().toLowerCase();
   const nombre = document.getElementById('nu-nombre').value.trim();
   const rol = document.getElementById('nu-rol').value;
   const errEl = document.getElementById('nu-error');
   const btn = document.getElementById('nu-btn');
   errEl.style.display = 'none';
 
-  if (!username || username.length < 3) { errEl.textContent='El nombre de usuario debe tener al menos 3 caracteres'; errEl.style.display='block'; return; }
-  if (usuariosDB.find(u => u.username === username)) { errEl.textContent='Ese nombre de usuario ya existe'; errEl.style.display='block'; return; }
+  if (!email) { errEl.textContent='Ingresá un email'; errEl.style.display='block'; return; }
+  if (usuariosDB.find(u => u.email === email)) { errEl.textContent='Este email ya está registrado'; errEl.style.display='block'; return; }
 
   btn.disabled = true; btn.textContent = 'Creando...';
 
-  // Generar email interno y contraseña aleatoria
-  const email = username + '@cactuskids.interno';
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   let pass = '';
   for(let i=0;i<8;i++) pass += chars[Math.floor(Math.random()*chars.length)];
@@ -1716,115 +1710,50 @@ window.guardarNuevoUsuario = async function() {
     const data = await resp.json();
 
     if (data.error) {
-      errEl.textContent = 'Error: ' + data.error.message;
+      const errores = {
+        'EMAIL_EXISTS': 'Este email ya tiene una cuenta.',
+        'INVALID_EMAIL': 'El email no es válido.',
+      };
+      errEl.textContent = errores[data.error.message] || ('Error: ' + data.error.message);
       errEl.style.display = 'block';
       btn.disabled = false; btn.textContent = 'Crear usuario';
       return;
     }
 
-    // Guardar en Firestore con rol y username
-    // Guardar contraseña codificada (no es encriptación fuerte, solo para que no sea visible en texto plano)
     const passGuardada = btoa(pass);
     const doc = await fsAdd('usuarios', {
-      email, username, nombre: nombre||username, rol,
+      email, nombre: nombre||email, rol,
       activo: 'true',
       passGuardada,
       fechaAlta: new Date().toISOString(),
       ultimoAcceso: ''
     });
     usuariosDB.push(doc);
-    logAccion('usuario', 'crear', username+' como '+rol);
-
-    // Mostrar credenciales al admin
+    logAccion('usuario', 'crear', email+' como '+rol);
     cerrarModal();
     renderUsuarios();
     abrirModal('<h3>Usuario creado!</h3>'
       + '<div style="background:#e1f5ee;border-radius:8px;padding:1rem;margin-bottom:1rem">'
-      + '<div style="font-size:12px;color:#5f5e5a;margin-bottom:4px">Nombre de usuario</div>'
-      + '<div style="font-size:20px;font-weight:500;color:#085041;margin-bottom:12px">'+username+'</div>'
-      + '<div style="font-size:12px;color:#5f5e5a;margin-bottom:4px">Contrasena</div>'
-      + '<div style="font-size:20px;font-weight:500;color:#085041;letter-spacing:2px">'+pass+'</div>'
+      + '<div style="font-size:12px;color:#5f5e5a;margin-bottom:4px">Email</div>'
+      + '<div style="font-size:16px;font-weight:500;color:#085041;margin-bottom:12px">'+email+'</div>'
+      + '<div style="font-size:12px;color:#5f5e5a;margin-bottom:4px">Contraseña</div>'
+      + '<div style="font-size:22px;font-weight:500;color:#085041;letter-spacing:2px">'+pass+'</div>'
       + '</div>'
-      + '<div style="background:#faeeda;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:13px;color:#633806">⚠️ Anotá esta contraseña ahora. No se vuelve a mostrar.</div>'
+      + '<div style="font-size:13px;color:#5f5e5a;margin-bottom:1rem">Podés ver y cambiar la contraseña en cualquier momento desde <strong>Editar usuario</strong>.</div>'
       + '<div style="display:flex;gap:8px">'
-      + '<button onclick="copiarCredenciales(this.dataset.u,this.dataset.p)" data-u="'+username+'" data-p="'+pass+'" style="flex:1;padding:9px;font-size:13px;background:#e6f1fb;color:#185fa5;border:0.5px solid #85b7eb;border-radius:8px;cursor:pointer">Copiar credenciales</button>'
+      + '<button id="btn-copiar-cred" style="flex:1;padding:9px;font-size:13px;background:#e6f1fb;color:#185fa5;border:0.5px solid #85b7eb;border-radius:8px;cursor:pointer">Copiar credenciales</button>'
       + '<button class="btn-close" onclick="cerrarModal()" style="flex:1">Cerrar</button>'
       + '</div>');
+    setTimeout(() => {
+      const btnCop = document.getElementById('btn-copiar-cred');
+      if(btnCop) btnCop.onclick = () => navigator.clipboard.writeText('Email: '+email+'\nContrasena: '+pass+'\nURL: https://cactustucuman.com.ar').then(()=>toast('Copiado!','ok'));
+    }, 50);
   } catch(e) {
-    errEl.textContent = 'Error al crear el usuario. Intentá de nuevo.';
+    errEl.textContent = 'Error al crear el usuario.';
     errEl.style.display = 'block';
     btn.disabled = false; btn.textContent = 'Crear usuario';
   }
-};
-
-window.copiarCredenciales = function(username, pass) {
-  const texto = 'Usuario: ' + username + '\nContrasena: ' + pass + '\nURL: https://cactustucuman.com.ar';
-  navigator.clipboard.writeText(texto).then(() => toast('Credenciales copiadas!','ok'));
-};
-
-
-window.editarUsuario = function(id) {
-  const u = usuariosDB.find(x=>x.id===id);
-  if (!u) return;
-  const activo = u.activo !== 'false';
-  const passActual = u.passGuardada ? atob(u.passGuardada) : '—';
-  abrirModal('<h3>Editar usuario</h3>'
-    + '<div class="fg full" style="margin-bottom:12px"><div><label>Nombre de usuario</label><input id="eu-user" type="text" value="'+(u.username||'')+'" style="width:100%"></div></div>'
-    + '<div class="fg full" style="margin-bottom:12px"><div><label>Nombre completo</label><input id="eu-nombre" type="text" value="'+(u.nombre||'')+'" style="width:100%"></div></div>'
-    + '<div style="background:#f1efe8;border-radius:8px;padding:10px 14px;margin-bottom:12px">'
-    + '<div style="font-size:12px;color:#5f5e5a;margin-bottom:4px">Contraseña actual</div>'
-    + '<div style="font-size:18px;font-weight:500;letter-spacing:2px">'+passActual+'</div></div>'
-    + '<div class="fg full" style="margin-bottom:12px"><div><label>Nueva contraseña (dejar vacío para no cambiar)</label><input id="eu-pass" type="text" placeholder="Nueva contraseña" style="width:100%"></div></div>'
-    + '<div class="fg full" style="margin-bottom:12px"><div><label>Rol</label><select id="eu-rol" style="width:100%">'
-    + '<option value="colaboradora"'+(u.rol==='colaboradora'?' selected':'')+'>Colaboradora</option>'
-    + '<option value="admin"'+(u.rol==='admin'?' selected':'')+'>Admin</option>'
-    + '</select></div></div>'
-    + '<div class="fg full" style="margin-bottom:12px"><div><label>Estado</label><select id="eu-activo" style="width:100%">'
-    + '<option value="true"'+(activo?' selected':'')+'>Activa</option>'
-    + '<option value="false"'+(!activo?' selected':'')+'>Desactivada</option>'
-    + '</select></div></div>'
-    + '<div id="eu-msg" style="font-size:13px;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:none"></div>'
-    + '<div class="mactions"><button class="btn-save" style="flex:2" id="eu-btn-save">Guardar cambios</button><button class="btn-close" onclick="cerrarModal()">Cancelar</button></div>');
-  document.getElementById('eu-btn-save').onclick = () => guardarEdicionUsuario(id);
-};
-
-window.guardarEdicionUsuario = async function(id) {
-  const u = usuariosDB.find(x=>x.id===id);
-  if (!u) return;
-  const nuevoUser = document.getElementById('eu-user').value.trim().toLowerCase();
-  const nuevoNombre = document.getElementById('eu-nombre').value.trim();
-  const nuevoRol = document.getElementById('eu-rol').value;
-  const nuevoActivo = document.getElementById('eu-activo').value;
-  const nuevaPass = document.getElementById('eu-pass').value.trim();
-  const msg = document.getElementById('eu-msg');
-  if (!nuevoUser) { msg.textContent='El usuario es obligatorio'; msg.style.display='block'; msg.style.color='#a32d2d'; msg.style.background='#fcebeb'; return; }
-  try {
-    const datos = {username:nuevoUser, nombre:nuevoNombre, rol:nuevoRol, activo:nuevoActivo};
-    // Si se ingresó nueva contraseña, cambiarla en Firebase y guardar en Firestore
-    if (nuevaPass && nuevaPass.length >= 6) {
-      const API_KEY_FB = 'AIzaSyB4MzBpmDKzcQdf7FOjdMQL0Yh8n6QOF6w';
-      // Obtener idToken del usuario actual para usar la API
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        const tk = await currentUser.getIdToken();
-        // Buscar el uid del usuario a editar via lookup
-        const lookup = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key='+API_KEY_FB, {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({idToken: tk})
-        });
-      }
-      datos.passGuardada = btoa(nuevaPass);
-      msg.textContent = 'Nota: el cambio de contraseña requiere que la colaboradora cierre sesión y vuelva a entrar.';
-      msg.style.color = '#633806'; msg.style.background = '#faeeda'; msg.style.display = 'block';
-    }
-    await fsPatch('usuarios', id, datos);
-    Object.assign(u, datos);
-    logAccion('usuario', 'editar', nuevoUser+' → rol:'+nuevoRol);
-    toast('Usuario actualizado!', 'ok');
-    if (!nuevaPass) cerrarModal();
-    renderUsuarios();
-  } catch(e) { toast('Error al actualizar', 'err'); }
-};
+}
 
 window.reenviarInvitacion = async function(id) {
   const u = usuariosDB.find(x=>x.id===id);
