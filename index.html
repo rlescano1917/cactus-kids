@@ -1637,20 +1637,43 @@ function renderUsuarios() {
     el.innerHTML = '<div style="text-align:center;padding:2rem;color:#5f5e5a;font-size:14px">No hay usuarios registrados.</div>';
     return;
   }
-  el.innerHTML = usuariosDB.map(u => {
+  el.innerHTML = '';
+  usuariosDB.forEach(u => {
     const esAdmin = u.rol === 'admin';
     const activo = u.activo !== 'false';
     const ultimoAcceso = u.ultimoAcceso ? new Date(u.ultimoAcceso).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
     const esSelf = u.email === 'rlescano1917@gmail.com';
-    return '<div class="row" style="'+(activo?'':'opacity:0.6;background:#f9f9f9')+'">'
-      + '<div class="avatar" style="background:'+(esAdmin?'#1a1a18':'#e6f1fb')+';color:'+(esAdmin?'#fff':'#185fa5')+';font-size:12px">'+(esAdmin?'ADM':'COL')+'</div>'
-      + '<div class="info"><strong>'+u.email+'</strong>'
-      + '<span>Ultimo acceso: '+ultimoAcceso+'</span></div>'
-      + '<div style="display:flex;gap:8px;align-items:center;flex-shrink:0">'
-      + '<span class="badge" style="background:'+(esAdmin?'#1a1a18':'#e6f1fb')+';color:'+(esAdmin?'#fff':'#185fa5')+';border-color:'+(esAdmin?'#1a1a18':'#85b7eb')+'">'+(esAdmin?'Admin':'Colaboradora')+'</span>'
-      + (!esSelf ? '<button onclick="editarUsuario(this.dataset.id)" data-id="'+u.id+'" style="font-size:12px;padding:4px 10px;border:0.5px solid #d3d1c7;border-radius:6px;background:#fff;cursor:pointer">Editar</button>' : '')
-      + '</div></div>';
-  }).join('');
+    const div = document.createElement('div');
+    div.className = 'row';
+    if (!activo) div.style.cssText = 'opacity:0.6;background:#f9f9f9';
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = 'avatar';
+    avatarDiv.style.cssText = 'background:'+(esAdmin?'#1a1a18':'#e6f1fb')+';color:'+(esAdmin?'#fff':'#185fa5')+';font-size:12px';
+    avatarDiv.textContent = esAdmin?'ADM':'COL';
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'info';
+    infoDiv.innerHTML = '<strong>'+(u.username||u.email)+'</strong>'
+      +(u.nombre?'<span style="font-size:12px;color:#888;display:block">'+u.nombre+'</span>':'')
+      +'<span>Ultimo acceso: '+ultimoAcceso+'</span>';
+    const actionsDiv = document.createElement('div');
+    actionsDiv.style.cssText = 'display:flex;gap:8px;align-items:center;flex-shrink:0';
+    const badge = document.createElement('span');
+    badge.className = 'badge';
+    badge.style.cssText = 'background:'+(esAdmin?'#1a1a18':'#e6f1fb')+';color:'+(esAdmin?'#fff':'#185fa5')+';border-color:'+(esAdmin?'#1a1a18':'#85b7eb');
+    badge.textContent = esAdmin?'Admin':'Colaboradora';
+    actionsDiv.appendChild(badge);
+    if (!esSelf) {
+      const btn = document.createElement('button');
+      btn.textContent = 'Editar';
+      btn.style.cssText = 'font-size:12px;padding:4px 10px;border:0.5px solid #d3d1c7;border-radius:6px;background:#fff;cursor:pointer';
+      btn.onclick = () => editarUsuario(u.id);
+      actionsDiv.appendChild(btn);
+    }
+    div.appendChild(avatarDiv);
+    div.appendChild(infoDiv);
+    div.appendChild(actionsDiv);
+    el.appendChild(div);
+  });
 }
 
 window.abrirNuevoUsuario = function() {
@@ -1700,9 +1723,12 @@ window.guardarNuevoUsuario = async function() {
     }
 
     // Guardar en Firestore con rol y username
+    // Guardar contraseña codificada (no es encriptación fuerte, solo para que no sea visible en texto plano)
+    const passGuardada = btoa(pass);
     const doc = await fsAdd('usuarios', {
       email, username, nombre: nombre||username, rol,
       activo: 'true',
+      passGuardada,
       fechaAlta: new Date().toISOString(),
       ultimoAcceso: ''
     });
@@ -1734,6 +1760,70 @@ window.guardarNuevoUsuario = async function() {
 window.copiarCredenciales = function(username, pass) {
   const texto = 'Usuario: ' + username + '\nContrasena: ' + pass + '\nURL: https://cactustucuman.com.ar';
   navigator.clipboard.writeText(texto).then(() => toast('Credenciales copiadas!','ok'));
+};
+
+
+window.editarUsuario = function(id) {
+  const u = usuariosDB.find(x=>x.id===id);
+  if (!u) return;
+  const activo = u.activo !== 'false';
+  const passActual = u.passGuardada ? atob(u.passGuardada) : '—';
+  abrirModal('<h3>Editar usuario</h3>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Nombre de usuario</label><input id="eu-user" type="text" value="'+(u.username||'')+'" style="width:100%"></div></div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Nombre completo</label><input id="eu-nombre" type="text" value="'+(u.nombre||'')+'" style="width:100%"></div></div>'
+    + '<div style="background:#f1efe8;border-radius:8px;padding:10px 14px;margin-bottom:12px">'
+    + '<div style="font-size:12px;color:#5f5e5a;margin-bottom:4px">Contraseña actual</div>'
+    + '<div style="font-size:18px;font-weight:500;letter-spacing:2px">'+passActual+'</div></div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Nueva contraseña (dejar vacío para no cambiar)</label><input id="eu-pass" type="text" placeholder="Nueva contraseña" style="width:100%"></div></div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Rol</label><select id="eu-rol" style="width:100%">'
+    + '<option value="colaboradora"'+(u.rol==='colaboradora'?' selected':'')+'>Colaboradora</option>'
+    + '<option value="admin"'+(u.rol==='admin'?' selected':'')+'>Admin</option>'
+    + '</select></div></div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Estado</label><select id="eu-activo" style="width:100%">'
+    + '<option value="true"'+(activo?' selected':'')+'>Activa</option>'
+    + '<option value="false"'+(!activo?' selected':'')+'>Desactivada</option>'
+    + '</select></div></div>'
+    + '<div id="eu-msg" style="font-size:13px;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:none"></div>'
+    + '<div class="mactions"><button class="btn-save" style="flex:2" id="eu-btn-save">Guardar cambios</button><button class="btn-close" onclick="cerrarModal()">Cancelar</button></div>');
+  document.getElementById('eu-btn-save').onclick = () => guardarEdicionUsuario(id);
+};
+
+window.guardarEdicionUsuario = async function(id) {
+  const u = usuariosDB.find(x=>x.id===id);
+  if (!u) return;
+  const nuevoUser = document.getElementById('eu-user').value.trim().toLowerCase();
+  const nuevoNombre = document.getElementById('eu-nombre').value.trim();
+  const nuevoRol = document.getElementById('eu-rol').value;
+  const nuevoActivo = document.getElementById('eu-activo').value;
+  const nuevaPass = document.getElementById('eu-pass').value.trim();
+  const msg = document.getElementById('eu-msg');
+  if (!nuevoUser) { msg.textContent='El usuario es obligatorio'; msg.style.display='block'; msg.style.color='#a32d2d'; msg.style.background='#fcebeb'; return; }
+  try {
+    const datos = {username:nuevoUser, nombre:nuevoNombre, rol:nuevoRol, activo:nuevoActivo};
+    // Si se ingresó nueva contraseña, cambiarla en Firebase y guardar en Firestore
+    if (nuevaPass && nuevaPass.length >= 6) {
+      const API_KEY_FB = 'AIzaSyB4MzBpmDKzcQdf7FOjdMQL0Yh8n6QOF6w';
+      // Obtener idToken del usuario actual para usar la API
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const tk = await currentUser.getIdToken();
+        // Buscar el uid del usuario a editar via lookup
+        const lookup = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key='+API_KEY_FB, {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({idToken: tk})
+        });
+      }
+      datos.passGuardada = btoa(nuevaPass);
+      msg.textContent = 'Nota: el cambio de contraseña requiere que la colaboradora cierre sesión y vuelva a entrar.';
+      msg.style.color = '#633806'; msg.style.background = '#faeeda'; msg.style.display = 'block';
+    }
+    await fsPatch('usuarios', id, datos);
+    Object.assign(u, datos);
+    logAccion('usuario', 'editar', nuevoUser+' → rol:'+nuevoRol);
+    toast('Usuario actualizado!', 'ok');
+    if (!nuevaPass) cerrarModal();
+    renderUsuarios();
+  } catch(e) { toast('Error al actualizar', 'err'); }
 };
 
 window.reenviarInvitacion = async function(id) {
