@@ -491,9 +491,9 @@ import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from 'htt
 const auth = getAuth(initializeApp({apiKey:"AIzaSyB4MzBpmDKzcQdf7FOjdMQL0Yh8n6QOF6w",authDomain:"cactus-kids-da0b0.firebaseapp.com",projectId:"cactus-kids-da0b0"}));
 const BASE = "https://firestore.googleapis.com/v1/projects/cactus-kids-da0b0/databases/(default)/documents";
 
-let clientes=[], cuentas=[], ventas=[], gastos=[];
+let clientes=[], cuentas=[], ventas=[], gastos=[], solicitudes=[], auditoria=[];
 let hijosTemp=[], editHijosTemp=[], prodsTemp=[];
-let filtroCl='todos', filtroCC='todos';
+let filtroCl='todos', filtroCC='todos', filtroSol='todas';
 let cliSelVId=null, cliSelVNombre='';
 let cliSelCCId=null, cliSelCCNombre='';
 let pagoSel=null, modalidadFiado='unico';
@@ -636,7 +636,7 @@ function toFs(data) {
 
 async function initData() {
   try {
-    [clientes,cuentas,ventas,gastos]=await Promise.all([fsGet('clientes'),fsGet('cuentas'),fsGet('ventas'),fsGet('gastos')]);
+    [clientes,cuentas,ventas,gastos,solicitudes]=await Promise.all([fsGet('clientes'),fsGet('cuentas'),fsGet('ventas'),fsGet('gastos'),fsGet('solicitudes')]);
     renderClientes(); renderVentas(); renderCuentas(); renderGastos();
     poblarFiltroMes();
   } catch(e) {
@@ -1695,7 +1695,7 @@ window.guardarNuevoUsuario = async function() {
   if (!email) { errEl.textContent='Ingresá un email'; errEl.style.display='block'; return; }
   if (usuariosDB.find(u => u.email === email)) { errEl.textContent='Este email ya está registrado'; errEl.style.display='block'; return; }
   try {
-    const passGuardada = pass ? btoa(pass) : '';
+    const passGuardada = pass ? await hashPass(pass) : '';
     const doc = await fsAdd('usuarios', {
       email, nombre: nombre||email, rol,
       activo: 'true',
@@ -1720,7 +1720,7 @@ window.guardarEdicionUsuario = async function(id) {
   const nuevaPass = document.getElementById('eu-pass')?.value.trim()||'';
   try {
     const datos = {nombre:nuevoNombre, rol:nuevoRol, activo:nuevoActivo};
-    if (nuevaPass && nuevaPass.length >= 6) datos.passGuardada = btoa(nuevaPass);
+    if (nuevaPass && nuevaPass.length >= 6) datos.passGuardada = await hashPass(nuevaPass);
     await fsPatch('usuarios', id, datos);
     Object.assign(u, datos);
     logAccion('usuario', 'editar', u.email+' rol:'+nuevoRol);
@@ -1850,6 +1850,159 @@ window.cambiarEstadoSolicitud = async function(id, nuevoEstado) {
       setTimeout(() => window.open(waUrl,'_blank'), 500);
     } catch(e) { toast('Error','err'); }
   }
+};
+
+// ==================== AUDITORIA ====================
+async function hashPass(pass) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pass));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+async function logAccion(modulo, accion, detalle) {
+  const user = auth.currentUser;
+  const entry = {
+    modulo, accion, detalle,
+    usuario: user?.email || 'desconocido',
+    fecha: new Date().toISOString()
+  };
+  try {
+    const doc = await fsAdd('auditoria', entry);
+    auditoria.unshift(doc);
+  } catch(e) {
+    console.warn('Error al registrar auditoria:', e);
+  }
+}
+
+async function cargarAuditoria() {
+  const el = document.getElementById('lista-auditoria');
+  try {
+    auditoria = await fsGet('auditoria');
+    auditoria.sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
+    const usuarios = [...new Set(auditoria.map(a => a.usuario).filter(Boolean))];
+    const selUser = document.getElementById('filtro-aud-usuario');
+    if (selUser) {
+      selUser.innerHTML = '<option value="">Todos los usuarios</option>'
+        + usuarios.map(u => '<option value="'+u+'">'+u+'</option>').join('');
+    }
+    renderAuditoria();
+  } catch(e) {
+    if(el) el.innerHTML = '<div style="text-align:center;padding:2rem;color:#a32d2d;font-size:14px">Error al cargar auditoria.</div>';
+  }
+}
+
+window.renderAuditoria = function() {
+  const el = document.getElementById('lista-auditoria');
+  if (!el) return;
+  const fUsuario = document.getElementById('filtro-aud-usuario')?.value || '';
+  const fTipo = document.getElementById('filtro-aud-tipo')?.value || '';
+  const fFecha = document.getElementById('filtro-aud-fecha')?.value || '';
+
+  let f = [...auditoria];
+  if (fUsuario) f = f.filter(a => a.usuario === fUsuario);
+  if (fTipo) f = f.filter(a => a.modulo === fTipo);
+  if (fFecha) {
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    if (fFecha === 'hoy') f = f.filter(a => a.fecha && a.fecha.slice(0,10) === hoy.toISOString().slice(0,10));
+    else if (fFecha === 'semana') { const sem = new Date(hoy); sem.setDate(sem.getDate()-7); f = f.filter(a => a.fecha && new Date(a.fecha) >= sem); }
+    else if (fFecha === 'mes') { const mes = new Date(hoy); mes.setDate(mes.getDate()-30); f = f.filter(a => a.fecha && new Date(a.fecha) >= mes); }
+  }
+
+  const cont = document.getElementById('contador-aud');
+  if (cont) cont.textContent = f.length + ' registro' + (f.length!==1?'s':'');
+
+  if (!f.length) { el.innerHTML = '<div style="text-align:center;padding:2rem;color:#5f5e5a;font-size:14px">No hay registros.</div>'; return; }
+
+  const moduloBg = {cliente:'#e6f1fb',venta:'#e1f5ee',cuenta:'#faeeda',gasto:'#fcebeb',usuario:'#f1efe8',solicitud:'#e1f5ee'};
+  el.innerHTML = f.map(a => {
+    const fecha = a.fecha ? new Date(a.fecha).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+    const bg = moduloBg[a.modulo] || '#f1efe8';
+    return '<div class="row" style="cursor:default"><div class="avatar" style="background:'+bg+';color:#1a1a18;font-size:11px;font-weight:500">'+(a.modulo||'').substring(0,4).toUpperCase()+'</div><div class="info"><strong>'+val(a.accion)+' · '+val(a.detalle)+'</strong><span>'+(a.usuario||'—')+' · '+fecha+'</span></div></div>';
+  }).join('');
+};
+
+// ==================== SOLICITUDES FILTRO ====================
+window.setFiltroSol = function(f, el) {
+  filtroSol = f;
+  document.querySelectorAll('#mod-solicitudes .filtro').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderSolicitudes();
+};
+
+async function cargarSolicitudes() {
+  const el = document.getElementById('lista-solicitudes');
+  try {
+    solicitudes = await fsGet('solicitudes');
+    renderSolicitudes();
+  } catch(e) {
+    if(el) el.innerHTML = '<div style="text-align:center;padding:2rem;color:#a32d2d;font-size:14px">Error al cargar solicitudes.</div>';
+  }
+}
+
+// ==================== ESTADISTICAS ====================
+window.renderStats = function() {
+  const el = document.getElementById('stats-content');
+  if (!el) return;
+  const meses = parseInt(document.getElementById('stats-periodo')?.value) || 6;
+  const hoy = new Date();
+  const desdeStr = new Date(hoy.getFullYear(), hoy.getMonth() - meses + 1, 1).toISOString().slice(0,7);
+
+  const ventasPer = ventas.filter(v => v.fecha && v.fecha.slice(0,7) >= desdeStr);
+  const totalVentas = ventasPer.reduce((t,v) => t+(v.total||0), 0);
+  const gastosPer = gastos.filter(g => g.fecha && g.fecha.slice(0,7) >= desdeStr);
+  const totalGastos = gastosPer.reduce((t,g) => t+(g.monto||0), 0);
+  const ganancia = totalVentas - totalGastos;
+  const deudaTotal = cuentas.reduce((t,c) => t+Math.max(0,saldo(c)), 0);
+  const cuentasVencidas = cuentas.filter(c=>estadoCuenta(c)==='vencida').length;
+  const clientesNuevos = clientes.filter(c => c.fechaAlta && c.fechaAlta.slice(0,7) >= desdeStr).length;
+
+  const formasPago = ['efectivo','transferencia','tarjeta','fiado'];
+  const colorPago = {efectivo:['#e1f5ee','#085041'],transferencia:['#e6f1fb','#0c447c'],tarjeta:['#faeeda','#633806'],fiado:['#fcebeb','#a32d2d']};
+  const totalesPago = Object.fromEntries(formasPago.map(fp => [fp, ventasPer.filter(v=>v.formaPago===fp).reduce((t,v)=>t+(v.total||0),0)]));
+
+  const mesesArray = [];
+  for (let i = meses-1; i >= 0; i--) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    mesesArray.push(d.toISOString().slice(0,7));
+  }
+  const maxV = Math.max(1, ...mesesArray.map(m => ventas.filter(v=>v.fecha&&v.fecha.startsWith(m)).reduce((t,v)=>t+(v.total||0),0)));
+
+  el.innerHTML = '<div class="card">'
+    + '<div class="sec-title">Resumen (' + meses + ' meses)</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:1rem">'
+    + '<div style="background:#e1f5ee;border-radius:8px;padding:0.75rem;text-align:center"><div style="font-size:11px;color:#085041;margin-bottom:4px">Ventas</div><div style="font-size:18px;font-weight:500;color:#085041">'+fmt(totalVentas)+'</div><div style="font-size:11px;color:#085041">'+ventasPer.length+' transacciones</div></div>'
+    + '<div style="background:'+(ganancia>=0?'#e1f5ee':'#fcebeb')+';border-radius:8px;padding:0.75rem;text-align:center"><div style="font-size:11px;color:'+(ganancia>=0?'#085041':'#a32d2d')+';margin-bottom:4px">Ganancia</div><div style="font-size:18px;font-weight:500;color:'+(ganancia>=0?'#085041':'#a32d2d')+'">'+fmt(ganancia)+'</div><div style="font-size:11px;color:#5f5e5a">Gastos: '+fmt(totalGastos)+'</div></div>'
+    + '<div style="background:#fcebeb;border-radius:8px;padding:0.75rem;text-align:center"><div style="font-size:11px;color:#a32d2d;margin-bottom:4px">Deuda total</div><div style="font-size:18px;font-weight:500;color:#a32d2d">'+fmt(deudaTotal)+'</div><div style="font-size:11px;color:#a32d2d">'+cuentasVencidas+' cuentas vencidas</div></div>'
+    + '<div style="background:#e6f1fb;border-radius:8px;padding:0.75rem;text-align:center"><div style="font-size:11px;color:#185fa5;margin-bottom:4px">Clientes nuevos</div><div style="font-size:18px;font-weight:500;color:#185fa5">'+clientesNuevos+'</div><div style="font-size:11px;color:#185fa5">Total: '+clientes.length+'</div></div>'
+    + '</div>'
+    + '<div class="sec-title">Forma de pago</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem">'
+    + (totalVentas > 0
+        ? formasPago.map(fp => '<div style="background:'+colorPago[fp][0]+';border-radius:8px;padding:0.75rem"><div style="font-size:11px;color:'+colorPago[fp][1]+';text-transform:capitalize">'+fp+'</div><div style="font-size:16px;font-weight:500;color:'+colorPago[fp][1]+'">'+fmt(totalesPago[fp])+'</div><div style="font-size:11px;color:'+colorPago[fp][1]+'">'+Math.round(totalesPago[fp]/totalVentas*100)+'%</div></div>').join('')
+        : '<div style="font-size:13px;color:#5f5e5a;grid-column:1/-1">Sin ventas en el periodo.</div>')
+    + '</div>'
+    + '<div class="sec-title">Ventas por mes</div>'
+    + '<div style="margin-bottom:1rem">'
+    + mesesArray.map(m => {
+        const mv = ventas.filter(v=>v.fecha&&v.fecha.startsWith(m)).reduce((t,v)=>t+(v.total||0),0);
+        const pct = Math.round((mv/maxV)*100);
+        return '<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>'+m+'</span><span style="font-weight:500">'+fmt(mv)+'</span></div><div style="background:#e0dfd8;border-radius:4px;height:8px"><div style="background:#1a1a18;border-radius:4px;height:8px;width:'+pct+'%;transition:width 0.3s"></div></div></div>';
+      }).join('')
+    + '</div>'
+    + '</div>';
+};
+
+// ==================== EDITAR USUARIO ====================
+window.editarUsuario = function(id) {
+  const u = usuariosDB.find(x=>x.id===id);
+  if (!u) return;
+  abrirModal('<h3>Editar usuario</h3>'
+    + '<div class="mf"><span>Email</span>'+val(u.email)+'</div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Nombre</label><input id="eu-nombre" type="text" value="'+(u.nombre||'')+'" style="width:100%"></div></div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Rol</label><select id="eu-rol" style="width:100%"><option value="colaboradora"'+(u.rol==='colaboradora'?' selected':'')+'>Colaboradora</option><option value="admin"'+(u.rol==='admin'?' selected':'')+'>Admin</option></select></div></div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Estado</label><select id="eu-activo" style="width:100%"><option value="true"'+(u.activo!=='false'?' selected':'')+'>Activo</option><option value="false"'+(u.activo==='false'?' selected':'')+'>Desactivado</option></select></div></div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Nueva contrasena (opcional)</label><input id="eu-pass" type="text" placeholder="Dejar vacio para no cambiar" style="width:100%"></div></div>'
+    + '<div id="eu-msg" style="margin-bottom:8px;border-radius:8px;display:none"></div>'
+    + '<div class="mactions"><button class="btn-save" style="flex:2" onclick="guardarEdicionUsuario(\''+id+'\')">Guardar cambios</button><button onclick="reenviarInvitacion(\''+id+'\')" style="flex:1;padding:8px;font-size:13px;border:0.5px solid #b4b2a9;color:#5f5e5a;background:transparent;border-radius:8px;cursor:pointer">Compartir acceso</button><button class="btn-close" onclick="cerrarModal()">Cancelar</button></div>');
 };
 
 </script>
