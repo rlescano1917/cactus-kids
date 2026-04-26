@@ -768,7 +768,7 @@ window.verCliente=function(id){
     +'</div>'
     +((c.puntos||0)>=10?'<button onclick="canjearPuntos(\''+c.id+'\')" style="padding:8px 14px;font-size:13px;font-weight:500;background:#633806;color:#fff;border:none;border-radius:8px;cursor:pointer">Canjear $500</button>':'')
     +'</div></div>'
-    +'<div class="mactions"><button class="btn-edit" onclick="editarCliente(\''+c.id+'\')">Editar</button><button class="btn-del" onclick="eliminarCliente(\''+c.id+'\')">Eliminar</button><button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>');
+    +'<div class="mactions"><button class="btn-edit" onclick="editarCliente(\''+c.id+'\')">Editar</button>'+(rolActual==='admin'?'<button class="btn-del" onclick="eliminarCliente(\''+c.id+'\')">Eliminar</button>':'')+'<button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>');
 };
 
 window.editarCliente=function(id){
@@ -956,7 +956,7 @@ function renderVentas(){
 window.verVenta=function(id){
   const v=ventas.find(x=>x.id===id);if(!v)return;
   const prods=v.productos?.length?v.productos.map(p=>'<div style="background:#f1efe8;border-radius:8px;padding:8px;margin-bottom:6px;font-size:13px;display:flex;justify-content:space-between"><span>'+(p.desc||'—')+(p.talle?' · '+p.talle:'')+' x'+(p.cantidad||1)+'</span><span style="font-weight:500">'+fmt((p.precio||0)*(p.cantidad||1))+'</span></div>').join(''):'<span style="font-size:13px;color:#5f5e5a">Sin detalle</span>';
-  abrirModal('<h3>Venta a '+v.clienteNombre+'</h3>'+'<div class="mf"><span>Fecha</span>'+val(v.fecha)+'</div>'+'<div class="mf"><span>Forma de pago</span>'+(v.formaPago||'—')+'</div>'+(v.ajuste?'<div class="mf"><span>Ajuste</span>'+v.ajuste+'</div>':'')+'<div class="mf"><span>Productos</span>'+prods+'</div>'+'<div style="background:#1a1a18;border-radius:8px;padding:0.75rem 1rem;margin:0.75rem 0;display:flex;justify-content:space-between;align-items:center"><span style="color:#f1efe8;font-size:14px">Total</span><span style="color:#fff;font-size:18px;font-weight:500">'+fmt(v.total||0)+'</span></div>'+'<div class="mf"><span>Notas</span>'+val(v.notas)+'</div>'+'<div class="mactions"><button class="btn-del" onclick="eliminarVenta(\''+v.id+'\')">Eliminar</button><button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>');
+  abrirModal('<h3>Venta a '+v.clienteNombre+'</h3>'+'<div class="mf"><span>Fecha</span>'+val(v.fecha)+'</div>'+'<div class="mf"><span>Forma de pago</span>'+(v.formaPago||'—')+'</div>'+(v.ajuste?'<div class="mf"><span>Ajuste</span>'+v.ajuste+'</div>':'')+'<div class="mf"><span>Productos</span>'+prods+'</div>'+'<div style="background:#1a1a18;border-radius:8px;padding:0.75rem 1rem;margin:0.75rem 0;display:flex;justify-content:space-between;align-items:center"><span style="color:#f1efe8;font-size:14px">Total</span><span style="color:#fff;font-size:18px;font-weight:500">'+fmt(v.total||0)+'</span></div>'+'<div class="mf"><span>Notas</span>'+val(v.notas)+'</div>'+'<div class="mactions">'+(rolActual==='admin'?'<button class="btn-del" onclick="eliminarVenta(\''+v.id+'\')">Eliminar</button>':'')+'<button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>');
 };
 window.eliminarVenta=async function(id){
   if(rolActual!=='admin'){toast('Solo el administrador puede eliminar ventas','err');return;}
@@ -1046,7 +1046,7 @@ window.verCuenta=function(id){
       else if(diff<=7)vb='<span class="vbadge porVencer">Vence en '+diff+'d</span>';
       else vb='<span class="vbadge aldia">Vence '+m.vencimiento+'</span>';
     }
-    return'<div class="mov-row"><div class="mov-top"><span class="mov-tipo '+m.tipo+'">'+(m.tipo==='cargo'?'Cargo':'Pago')+'</span><span class="mov-desc">'+(m.desc||'—')+'</span><span class="mov-monto '+m.tipo+'">'+(m.tipo==='cargo'?'+':'-')+fmt(m.monto)+'</span><button class="mov-del" onclick="eliminarMov(\''+id+'\','+m.id+')">x</button></div><div class="mov-bot">'+m.fecha+(vb?' '+vb:'')+'</div></div>';
+    return'<div class="mov-row"><div class="mov-top"><span class="mov-tipo '+m.tipo+'">'+(m.tipo==='cargo'?'Cargo':'Pago')+'</span><span class="mov-desc">'+(m.desc||'—')+'</span><span class="mov-monto '+m.tipo+'">'+(m.tipo==='cargo'?'+':'-')+fmt(m.monto)+'</span>'+(rolActual==='admin'?'<button class="mov-del" onclick="eliminarMov(\''+id+'\','+m.id+')">x</button>':'')+'</div><div class="mov-bot">'+m.fecha+(vb?' '+vb:'')+'</div></div>';
   }).join(''):'<div style="font-size:13px;color:#5f5e5a;padding:0.5rem 0">Sin movimientos.</div>';
 
   const est=estadoCuenta(c);
@@ -1466,7 +1466,7 @@ window.verGasto = function(id) {
     +'<div class="mf"><span>Monto</span><span style="font-size:18px;font-weight:500;color:#a32d2d">-'+fmt(g.monto)+'</span></div>'
     +'<div class="mf"><span>Fecha</span>'+val(g.fecha)+'</div>'
     +'<div class="mf"><span>Notas</span>'+val(g.notas)+'</div>'
-    +'<div class="mactions"><button class="btn-del" onclick="eliminarGasto(this.dataset.id)" data-id="'+id+'">Eliminar</button><button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>');
+    +'<div class="mactions">'+(rolActual==='admin'?'<button class="btn-del" onclick="eliminarGasto(this.dataset.id)" data-id="'+id+'">Eliminar</button>':'')+'<button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>');
 };
 
 window.eliminarGasto = async function(id) {
