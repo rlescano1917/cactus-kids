@@ -1710,3 +1710,148 @@ window.guardarNuevoUsuario = async function() {
     renderUsuarios();
   } catch(e) { toast('Error al guardar', 'err'); }
 }
+
+window.guardarEdicionUsuario = async function(id) {
+  const u = usuariosDB.find(x=>x.id===id);
+  if (!u) return;
+  const nuevoNombre = document.getElementById('eu-nombre')?.value.trim()||'';
+  const nuevoRol = document.getElementById('eu-rol')?.value||u.rol;
+  const nuevoActivo = document.getElementById('eu-activo')?.value||u.activo;
+  const nuevaPass = document.getElementById('eu-pass')?.value.trim()||'';
+  try {
+    const datos = {nombre:nuevoNombre, rol:nuevoRol, activo:nuevoActivo};
+    if (nuevaPass && nuevaPass.length >= 6) datos.passGuardada = btoa(nuevaPass);
+    await fsPatch('usuarios', id, datos);
+    Object.assign(u, datos);
+    logAccion('usuario', 'editar', u.email+' rol:'+nuevoRol);
+    toast('Usuario actualizado!', 'ok');
+    cerrarModal(); renderUsuarios();
+  } catch(e) { toast('Error al actualizar', 'err'); }
+};
+
+window.reenviarInvitacion = function(id) {
+  const u = usuariosDB.find(x=>x.id===id);
+  if (!u) return;
+  const msg = document.getElementById('eu-msg');
+  const waText = encodeURIComponent('Hola! Te invitamos a acceder al sistema de Cactus Kids.' + String.fromCharCode(10) + 'URL: https://cactustucuman.com.ar' + String.fromCharCode(10) + 'Email: ' + u.email);
+  const waUrl = 'https://wa.me/?text=' + waText;
+  if (msg) {
+    msg.style.display = 'block';
+    msg.style.color = '#085041';
+    msg.style.background = '#e1f5ee';
+    msg.style.padding = '10px';
+    msg.innerHTML = '<strong>Instrucciones de acceso</strong><br><div style="font-size:12px;margin:6px 0">Email: <strong>' + u.email + '</strong></div><a href="' + waUrl + '" target="_blank" style="display:inline-block;margin-top:8px;padding:8px 14px;background:#25D366;color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:500">Enviar por WhatsApp</a>';
+  }
+};
+
+function renderSolicitudes() {
+  const el = document.getElementById('lista-solicitudes');
+  if (!el) return;
+  const pendientes = solicitudes.filter(s => s.estado === 'pendiente').length;
+  const cont = document.getElementById('contador-sol');
+  if (cont) cont.textContent = solicitudes.length + ' solicitud' + (solicitudes.length!==1?'es':'') + (pendientes?' · '+pendientes+' pendiente'+(pendientes!==1?'s':''):'');
+  let f = solicitudes;
+  if (filtroSol !== 'todas') f = f.filter(s => s.estado === filtroSol);
+  if (!f.length) { el.innerHTML = '<div style="text-align:center;padding:2rem;color:#5f5e5a;font-size:14px">No hay solicitudes.</div>'; return; }
+  const colores = {
+    pendiente:{bg:'#faeeda',color:'#633806',border:'#fac775',label:'Pendiente'},
+    aprobada:{bg:'#e1f5ee',color:'#085041',border:'#5dcaa5',label:'Aprobada'},
+    rechazada:{bg:'#fcebeb',color:'#a32d2d',border:'#f09595',label:'Rechazada'}
+  };
+  el.innerHTML = '';
+  f.forEach(s => {
+    const cl = colores[s.estado]||colores['pendiente'];
+    const fecha = s.fechaSolicitud ? new Date(s.fechaSolicitud).toLocaleDateString('es-AR') : '—';
+    const ini = (s.nombre?.[0]||'')+(s.apellido?.[0]||'');
+    const esDup = clientes.find(c=>c.dni===s.dni);
+    const div = document.createElement('div');
+    div.className = 'row'+(s.estado==='pendiente'?' warn':'');
+    div.innerHTML = '<div class="avatar" style="background:'+cl.bg+';color:'+cl.color+'">'+ini.toUpperCase()+'</div>'
+      +'<div class="info"><strong>'+s.nombre+' '+s.apellido+'</strong><span>DNI '+s.dni+' · '+fecha+'</span></div>'
+      +'<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">'
+      +'<span style="font-size:11px;padding:2px 8px;border-radius:8px;background:'+cl.bg+';color:'+cl.color+';border:0.5px solid '+cl.border+'">'+cl.label+'</span>'
+      +(esDup?'<span style="font-size:11px;padding:2px 8px;border-radius:8px;background:#faeeda;color:#633806">Duplicado</span>':'')
+      +'</div>';
+    div.onclick = () => verSolicitud(s.id);
+    el.appendChild(div);
+  });
+}
+
+window.verSolicitud = function(id) {
+  const s = solicitudes.find(x=>x.id===id);
+  if (!s) return;
+  const colores = {pendiente:{bg:'#faeeda',color:'#633806',label:'Pendiente'},aprobada:{bg:'#e1f5ee',color:'#085041',label:'Aprobada'},rechazada:{bg:'#fcebeb',color:'#a32d2d',label:'Rechazada'}};
+  const cl = colores[s.estado]||colores['pendiente'];
+  const esDup = clientes.find(c=>c.dni===s.dni);
+  const waUrl = s.tel ? 'https://wa.me/549'+s.tel+'?text='+encodeURIComponent('Hola '+s.nombre+'! Te contactamos de Cactus Kids.') : '';
+  const div = document.createElement('div');
+  div.innerHTML = '<h3>Solicitud de '+s.nombre+' '+s.apellido+'</h3>'
+    +'<span style="font-size:12px;padding:3px 10px;border-radius:8px;background:'+cl.bg+';color:'+cl.color+';margin-bottom:1rem;display:inline-block">'+cl.label+'</span>'
+    +(esDup?'<div style="background:#faeeda;border:0.5px solid #fac775;border-radius:8px;padding:8px 12px;margin-bottom:1rem;font-size:13px;color:#633806">⚠️ DNI ya existe en clientes</div>':'')
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem">'
+    +'<div class="mf"><span>DNI</span>'+val(s.dni)+'</div>'
+    +'<div class="mf"><span>WhatsApp</span>'+val(s.tel)+'</div>'
+    +'<div class="mf"><span>Email</span>'+val(s.email)+'</div>'
+    +'<div class="mf"><span>Ciudad</span>'+val(s.ciudad)+'</div>'
+    +'<div class="mf"><span>Laboral</span>'+val(s.laboral)+'</div>'
+    +'<div class="mf"><span>Monto</span><strong>'+fmt(parseFloat(s.montoSolicitado)||0)+'</strong></div>'
+    +'</div>'
+    +(s.fotoFrente||s.fotoDorso||s.fotoSelfie?'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:1rem">'
+      +(s.fotoFrente?'<div><div style="font-size:11px;color:#5f5e5a;margin-bottom:4px">Frente</div><a href="'+s.fotoFrente+'" target="_blank"><img src="'+s.fotoFrente+'" style="width:100%;border-radius:8px"></a></div>':'')
+      +(s.fotoDorso?'<div><div style="font-size:11px;color:#5f5e5a;margin-bottom:4px">Dorso</div><a href="'+s.fotoDorso+'" target="_blank"><img src="'+s.fotoDorso+'" style="width:100%;border-radius:8px"></a></div>':'')
+      +(s.fotoSelfie?'<div><div style="font-size:11px;color:#5f5e5a;margin-bottom:4px">Selfie</div><a href="'+s.fotoSelfie+'" target="_blank"><img src="'+s.fotoSelfie+'" style="width:100%;border-radius:8px"></a></div>':'')
+      +'</div>':'');
+  const actions = document.createElement('div');
+  actions.className = 'mactions';
+  if (s.estado === 'pendiente') {
+    const btnAp = document.createElement('button');
+    btnAp.style.cssText = 'flex:1;padding:9px;font-size:13px;font-weight:500;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5;border-radius:8px;cursor:pointer';
+    btnAp.textContent = 'Aprobar';
+    btnAp.onclick = () => cambiarEstadoSolicitud(id, 'aprobada');
+    const btnRe = document.createElement('button');
+    btnRe.style.cssText = 'flex:1;padding:9px;font-size:13px;font-weight:500;background:#fcebeb;color:#a32d2d;border:0.5px solid #f09595;border-radius:8px;cursor:pointer';
+    btnRe.textContent = 'Rechazar';
+    btnRe.onclick = () => cambiarEstadoSolicitud(id, 'rechazada');
+    actions.appendChild(btnAp);
+    actions.appendChild(btnRe);
+  }
+  const btnClose = document.createElement('button');
+  btnClose.className = 'btn-close';
+  btnClose.textContent = 'Cerrar';
+  btnClose.onclick = cerrarModal;
+  actions.appendChild(btnClose);
+  div.appendChild(actions);
+  abrirModal(div.innerHTML);
+};
+
+window.cambiarEstadoSolicitud = async function(id, nuevoEstado) {
+  const s = solicitudes.find(x=>x.id===id);
+  if (!s) return;
+  if (nuevoEstado === 'rechazada') {
+    const motivo = await pedirMotivo('Vas a rechazar la solicitud de '+s.nombre+' '+s.apellido);
+    if (!motivo) return;
+    try {
+      await fsPatch('solicitudes', id, {estado:nuevoEstado, motivoRechazo:motivo, fechaResolucion:new Date().toISOString()});
+      s.estado = nuevoEstado;
+      cerrarModal(); renderSolicitudes(); toast('Solicitud rechazada','ok');
+    } catch(e) { toast('Error','err'); }
+  } else {
+    if (!confirm('Aprobar a '+s.nombre+' '+s.apellido+'?')) return;
+    try {
+      const cli = {nombre:s.nombre,apellido:s.apellido,dni:s.dni,fnac:s.fnac||'',tel:s.tel,tel2:'',tel2Desc:'',email:s.email||'',ciudad:s.ciudad||'',dir:s.dir||'',origen:'Solicitud online',tipo:'nuevo',notas:'Aprobado. Monto: '+fmt(parseFloat(s.montoSolicitado)||0),hijos:[],puntos:0,fechaAlta:new Date().toISOString()};
+      const docCli = await fsAdd('clientes', cli);
+      clientes.unshift(docCli);
+      await fsPatch('solicitudes', id, {estado:'aprobada',fechaResolucion:new Date().toISOString()});
+      s.estado = 'aprobada';
+      logAccion('solicitud','aprobar',s.nombre+' '+s.apellido);
+      const waUrl = 'https://wa.me/549'+s.tel+'?text='+encodeURIComponent('Hola '+s.nombre+'! Tu solicitud de credito fue APROBADA en Cactus Kids!');
+      cerrarModal(); renderSolicitudes(); renderClientes();
+      toast('Aprobada! Cliente agregado.','ok');
+      setTimeout(() => window.open(waUrl,'_blank'), 500);
+    } catch(e) { toast('Error','err'); }
+  }
+};
+
+</script>
+</body>
+</html>
