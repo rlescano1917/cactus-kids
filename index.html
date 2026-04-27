@@ -653,6 +653,12 @@ function fmt(n){return '$'+Math.round(n).toLocaleString('es-AR');}
 function val(v){return v&&String(v).trim()?v:'—';}
 function limpiarTel(t){return(t||'').replace(/[^0-9]/g,'');}
 
+// Exponer funciones de render al scope global para los oninput del HTML
+window.renderClientes=()=>renderClientes();
+window.renderVentas=()=>renderVentas();
+window.renderCuentas=()=>renderCuentas();
+window.renderGastos=()=>renderGastos();
+
 // NAVEGACION
 window.cambiarMod=function(m){
   const modulosAdmin=['auditoria','solicitudes','stats','usuarios'];
