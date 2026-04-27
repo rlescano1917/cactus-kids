@@ -486,9 +486,12 @@ textarea{height:60px;resize:vertical}
 
 <script type="module">
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged,sendPasswordResetEmail} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged,sendPasswordResetEmail,createUserWithEmailAndPassword} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
-const auth = getAuth(initializeApp({apiKey:"AIzaSyB4MzBpmDKzcQdf7FOjdMQL0Yh8n6QOF6w",authDomain:"cactus-kids-da0b0.firebaseapp.com",projectId:"cactus-kids-da0b0"}));
+const FB_CONFIG = {apiKey:"AIzaSyB4MzBpmDKzcQdf7FOjdMQL0Yh8n6QOF6w",authDomain:"cactus-kids-da0b0.firebaseapp.com",projectId:"cactus-kids-da0b0"};
+const auth = getAuth(initializeApp(FB_CONFIG));
+// Instancia secundaria para crear usuarios sin desloguear al admin
+const authSecundario = getAuth(initializeApp(FB_CONFIG, 'secondary'));
 const BASE = "https://firestore.googleapis.com/v1/projects/cactus-kids-da0b0/databases/(default)/documents";
 
 let clientes=[], cuentas=[], ventas=[], gastos=[], solicitudes=[], auditoria=[];
@@ -1676,27 +1679,34 @@ function renderUsuarios() {
 
 window.abrirNuevoUsuario = function() {
   abrirModal('<h3>Agregar usuario</h3>'
-    + '<div style="background:#e6f1fb;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:13px;color:#185fa5">Primero creá el usuario en Firebase Auth con su email. Luego registralo acá — le llegará un email para que cree su propia contraseña.</div>'
     + '<div class="fg full" style="margin-bottom:12px"><div><label>Email *</label><input id="nu-email" type="email" placeholder="colaboradora@gmail.com" style="width:100%"></div></div>'
     + '<div class="fg full" style="margin-bottom:12px"><div><label>Nombre completo</label><input id="nu-nombre" type="text" placeholder="Maria Gonzalez" style="width:100%"></div></div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Contrasena temporal *</label><input id="nu-pass" type="text" placeholder="Min. 6 caracteres" style="width:100%"><div style="font-size:11px;color:#5f5e5a;margin-top:3px">La colaboradora la cambia cuando ingresa por primera vez</div></div></div>'
     + '<div class="fg full" style="margin-bottom:12px"><div><label>Rol *</label><select id="nu-rol" style="width:100%"><option value="colaboradora">Colaboradora</option><option value="admin">Admin</option></select></div></div>'
     + '<div id="nu-error" style="font-size:13px;color:#a32d2d;background:#fcebeb;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:none"></div>'
     + '<div id="nu-exito" style="display:none"></div>'
-    + '<div class="mactions"><button class="btn-save" style="flex:2" id="nu-btn" onclick="guardarNuevoUsuario()">Registrar usuario</button><button class="btn-close" onclick="cerrarModal()">Cancelar</button></div>');
+    + '<div class="mactions"><button class="btn-save" style="flex:2" id="nu-btn" onclick="guardarNuevoUsuario()">Crear usuario</button><button class="btn-close" onclick="cerrarModal()">Cancelar</button></div>');
 };
 
 window.guardarNuevoUsuario = async function() {
   const email = document.getElementById('nu-email').value.trim().toLowerCase();
   const nombre = document.getElementById('nu-nombre').value.trim();
+  const pass = document.getElementById('nu-pass').value.trim();
   const rol = document.getElementById('nu-rol').value;
   const errEl = document.getElementById('nu-error');
   const exitoEl = document.getElementById('nu-exito');
   const btn = document.getElementById('nu-btn');
   errEl.style.display = 'none';
   if (!email) { errEl.textContent='Ingresá un email'; errEl.style.display='block'; return; }
+  if (!pass || pass.length < 6) { errEl.textContent='La contraseña debe tener al menos 6 caracteres'; errEl.style.display='block'; return; }
   if (usuariosDB.find(u => u.email === email)) { errEl.textContent='Este email ya está registrado'; errEl.style.display='block'; return; }
-  btn.disabled = true; btn.textContent = 'Registrando...';
+  btn.disabled = true; btn.textContent = 'Creando usuario...';
   try {
+    // Crear en Firebase Auth usando la instancia secundaria (no desloguea al admin)
+    await createUserWithEmailAndPassword(authSecundario, email, pass);
+    await signOut(authSecundario);
+
+    // Registrar en Firestore
     const doc = await fsAdd('usuarios', {
       email, nombre: nombre||email, rol,
       activo: 'true',
@@ -1706,23 +1716,26 @@ window.guardarNuevoUsuario = async function() {
     usuariosDB.push(doc);
     logAccion('usuario', 'crear', email+' como '+rol);
 
-    // Enviar email para que la colaboradora cree su propia contraseña
-    try { await sendPasswordResetEmail(auth, email); } catch(e) { /* usuario aún no existe en Firebase Auth */ }
-
-    // Mostrar botón de compartir acceso por WhatsApp
+    const primerNombre = nombre ? nombre.split(' ')[0] : '';
     const waText = encodeURIComponent(
-      'Hola' + (nombre ? ' ' + nombre.split(' ')[0] : '') + '! Te dimos acceso al sistema de Cactus Kids.\n'
-      + 'Revisá tu email (' + email + ') para crear tu contraseña.\n'
-      + 'Luego ingresá en: https://cactustucuman.com.ar'
+      'Hola' + (primerNombre ? ' ' + primerNombre : '') + '! Te dimos acceso al sistema de Cactus Kids.\n'
+      + 'Ingresá en: https://cactustucuman.com.ar\n'
+      + 'Email: ' + email + '\n'
+      + 'Contraseña temporal: ' + pass + '\n'
+      + 'Te recomendamos cambiarla desde la app.'
     );
     btn.style.display = 'none';
     exitoEl.style.cssText = 'background:#e1f5ee;border-radius:8px;padding:12px;font-size:13px;color:#085041';
-    exitoEl.innerHTML = '<strong>Usuario registrado!</strong><br>'
-      + '<div style="font-size:12px;margin:6px 0 10px">Se envió un email a <strong>' + email + '</strong> para que cree su contraseña.</div>'
-      + '<a href="https://wa.me/?text=' + waText + '" target="_blank" style="display:inline-block;padding:8px 16px;background:#25D366;color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:500">Compartir instrucciones por WhatsApp</a>';
+    exitoEl.innerHTML = '<strong>Usuario creado!</strong>'
+      + '<div style="font-size:12px;margin:6px 0 10px">El usuario <strong>' + email + '</strong> ya puede ingresar a la app.</div>'
+      + '<a href="https://wa.me/?text=' + waText + '" target="_blank" style="display:inline-block;padding:8px 16px;background:#25D366;color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:500">Enviar acceso por WhatsApp</a>';
     exitoEl.style.display = 'block';
     renderUsuarios();
-  } catch(e) { btn.disabled=false; btn.textContent='Registrar usuario'; toast('Error al guardar', 'err'); }
+  } catch(e) {
+    btn.disabled=false; btn.textContent='Crear usuario';
+    const msg = e.code === 'auth/email-already-in-use' ? 'Este email ya tiene una cuenta en Firebase.' : 'Error al crear el usuario.';
+    errEl.textContent = msg; errEl.style.display = 'block';
+  }
 }
 
 window.guardarEdicionUsuario = async function(id) {
