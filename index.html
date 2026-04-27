@@ -486,7 +486,7 @@ textarea{height:60px;resize:vertical}
 
 <script type="module">
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged,sendPasswordResetEmail} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 const auth = getAuth(initializeApp({apiKey:"AIzaSyB4MzBpmDKzcQdf7FOjdMQL0Yh8n6QOF6w",authDomain:"cactus-kids-da0b0.firebaseapp.com",projectId:"cactus-kids-da0b0"}));
 const BASE = "https://firestore.googleapis.com/v1/projects/cactus-kids-da0b0/databases/(default)/documents";
@@ -1676,39 +1676,53 @@ function renderUsuarios() {
 
 window.abrirNuevoUsuario = function() {
   abrirModal('<h3>Agregar usuario</h3>'
-    + '<div style="background:#e6f1fb;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:13px;color:#185fa5">Primero creá el usuario en Firebase con su email y contraseña. Luego registralo acá para asignarle el rol.</div>'
+    + '<div style="background:#e6f1fb;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:13px;color:#185fa5">Primero creá el usuario en Firebase Auth con su email. Luego registralo acá — le llegará un email para que cree su propia contraseña.</div>'
     + '<div class="fg full" style="margin-bottom:12px"><div><label>Email *</label><input id="nu-email" type="email" placeholder="colaboradora@gmail.com" style="width:100%"></div></div>'
     + '<div class="fg full" style="margin-bottom:12px"><div><label>Nombre completo</label><input id="nu-nombre" type="text" placeholder="Maria Gonzalez" style="width:100%"></div></div>'
-    + '<div class="fg full" style="margin-bottom:12px"><div><label>Contrasena (para tu registro)</label><input id="nu-pass" type="text" placeholder="La misma que pusiste en Firebase" style="width:100%"></div></div>'
     + '<div class="fg full" style="margin-bottom:12px"><div><label>Rol *</label><select id="nu-rol" style="width:100%"><option value="colaboradora">Colaboradora</option><option value="admin">Admin</option></select></div></div>'
     + '<div id="nu-error" style="font-size:13px;color:#a32d2d;background:#fcebeb;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:none"></div>'
+    + '<div id="nu-exito" style="display:none"></div>'
     + '<div class="mactions"><button class="btn-save" style="flex:2" id="nu-btn" onclick="guardarNuevoUsuario()">Registrar usuario</button><button class="btn-close" onclick="cerrarModal()">Cancelar</button></div>');
 };
 
 window.guardarNuevoUsuario = async function() {
   const email = document.getElementById('nu-email').value.trim().toLowerCase();
   const nombre = document.getElementById('nu-nombre').value.trim();
-  const pass = document.getElementById('nu-pass').value.trim();
   const rol = document.getElementById('nu-rol').value;
   const errEl = document.getElementById('nu-error');
+  const exitoEl = document.getElementById('nu-exito');
+  const btn = document.getElementById('nu-btn');
   errEl.style.display = 'none';
   if (!email) { errEl.textContent='Ingresá un email'; errEl.style.display='block'; return; }
   if (usuariosDB.find(u => u.email === email)) { errEl.textContent='Este email ya está registrado'; errEl.style.display='block'; return; }
+  btn.disabled = true; btn.textContent = 'Registrando...';
   try {
-    const passGuardada = pass ? await hashPass(pass) : '';
     const doc = await fsAdd('usuarios', {
       email, nombre: nombre||email, rol,
       activo: 'true',
-      passGuardada,
       fechaAlta: new Date().toISOString(),
       ultimoAcceso: ''
     });
     usuariosDB.push(doc);
     logAccion('usuario', 'crear', email+' como '+rol);
-    toast('Usuario registrado!', 'ok');
-    cerrarModal();
+
+    // Enviar email para que la colaboradora cree su propia contraseña
+    try { await sendPasswordResetEmail(auth, email); } catch(e) { /* usuario aún no existe en Firebase Auth */ }
+
+    // Mostrar botón de compartir acceso por WhatsApp
+    const waText = encodeURIComponent(
+      'Hola' + (nombre ? ' ' + nombre.split(' ')[0] : '') + '! Te dimos acceso al sistema de Cactus Kids.\n'
+      + 'Revisá tu email (' + email + ') para crear tu contraseña.\n'
+      + 'Luego ingresá en: https://cactustucuman.com.ar'
+    );
+    btn.style.display = 'none';
+    exitoEl.style.cssText = 'background:#e1f5ee;border-radius:8px;padding:12px;font-size:13px;color:#085041';
+    exitoEl.innerHTML = '<strong>Usuario registrado!</strong><br>'
+      + '<div style="font-size:12px;margin:6px 0 10px">Se envió un email a <strong>' + email + '</strong> para que cree su contraseña.</div>'
+      + '<a href="https://wa.me/?text=' + waText + '" target="_blank" style="display:inline-block;padding:8px 16px;background:#25D366;color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:500">Compartir instrucciones por WhatsApp</a>';
+    exitoEl.style.display = 'block';
     renderUsuarios();
-  } catch(e) { toast('Error al guardar', 'err'); }
+  } catch(e) { btn.disabled=false; btn.textContent='Registrar usuario'; toast('Error al guardar', 'err'); }
 }
 
 window.guardarEdicionUsuario = async function(id) {
@@ -1729,18 +1743,26 @@ window.guardarEdicionUsuario = async function(id) {
   } catch(e) { toast('Error al actualizar', 'err'); }
 };
 
-window.reenviarInvitacion = function(id) {
+window.reenviarInvitacion = async function(id) {
   const u = usuariosDB.find(x=>x.id===id);
   if (!u) return;
   const msg = document.getElementById('eu-msg');
-  const waText = encodeURIComponent('Hola! Te invitamos a acceder al sistema de Cactus Kids.' + String.fromCharCode(10) + 'URL: https://cactustucuman.com.ar' + String.fromCharCode(10) + 'Email: ' + u.email);
+
+  // Reenviar email de reset de contraseña
+  try { await sendPasswordResetEmail(auth, u.email); } catch(e) { /* ignorar si no existe en Firebase Auth */ }
+
+  const nombre = (u.nombre||'').split(' ')[0];
+  const waText = encodeURIComponent(
+    'Hola' + (nombre ? ' ' + nombre : '') + '! Te dimos acceso al sistema de Cactus Kids.\n'
+    + 'Revisá tu email (' + u.email + ') para crear o restablecer tu contraseña.\n'
+    + 'Luego ingresá en: https://cactustucuman.com.ar'
+  );
   const waUrl = 'https://wa.me/?text=' + waText;
   if (msg) {
-    msg.style.display = 'block';
-    msg.style.color = '#085041';
-    msg.style.background = '#e1f5ee';
-    msg.style.padding = '10px';
-    msg.innerHTML = '<strong>Instrucciones de acceso</strong><br><div style="font-size:12px;margin:6px 0">Email: <strong>' + u.email + '</strong></div><a href="' + waUrl + '" target="_blank" style="display:inline-block;margin-top:8px;padding:8px 14px;background:#25D366;color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:500">Enviar por WhatsApp</a>';
+    msg.style.cssText = 'display:block;background:#e1f5ee;border-radius:8px;padding:10px;font-size:13px;color:#085041';
+    msg.innerHTML = '<strong>Email de acceso enviado</strong>'
+      + '<div style="font-size:12px;margin:6px 0">Se envió un email a <strong>' + u.email + '</strong> para restablecer la contraseña.</div>'
+      + '<a href="' + waUrl + '" target="_blank" style="display:inline-block;margin-top:8px;padding:8px 14px;background:#25D366;color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:500">Compartir por WhatsApp</a>';
   }
 };
 
