@@ -498,6 +498,7 @@ const BASE = "https://firestore.googleapis.com/v1/projects/cactus-kids-da0b0/dat
 let clientes=[], cuentas=[], ventas=[], gastos=[], solicitudes=[], auditoria=[];
 let hijosTemp=[], editHijosTemp=[], prodsTemp=[];
 let filtroCl='todos', filtroCC='todos', filtroSol='todas';
+let _savingCliente=false, _savingVenta=false, _savingGasto=false;
 let cliSelVId=null, cliSelVNombre='';
 let cliSelCCId=null, cliSelCCNombre='';
 let pagoSel=null, modalidadFiado='unico';
@@ -657,8 +658,8 @@ window.cambiarMod=function(m){
   const modulosAdmin=['auditoria','solicitudes','stats','usuarios'];
   if(modulosAdmin.includes(m)&&rolActual!=='admin'){toast('Acceso restringido a administradores','err');return;}
   ['clientes','ventas','cuentas','gastos','auditoria','solicitudes','stats','usuarios'].forEach(x=>{document.getElementById('mod-'+x).classList.toggle('active',m===x);const nav=document.getElementById('nav-'+x);if(nav)nav.classList.toggle('active',m===x);});if(m==='gastos')renderResumenGastos();if(m==='auditoria')cargarAuditoria();if(m==='solicitudes')cargarSolicitudes();if(m==='stats')renderStats();if(m==='usuarios')cargarUsuarios();};
-window.showTabCl=function(t){['cl','cn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-cl-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderClientes();};
-window.showTabV=function(t){['vl','vn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-v-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderVentas();if(t==='nuevo')document.getElementById('v-fecha').value=new Date().toISOString().slice(0,10);};
+window.showTabCl=function(t){['cl','cn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-cl-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderClientes();if(t==='nuevo'){_savingCliente=false;const b=document.getElementById('btn-save-cl');if(b){b.disabled=false;b.textContent='Guardar en la nube';}}};
+window.showTabV=function(t){['vl','vn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-v-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderVentas();if(t==='nuevo'){document.getElementById('v-fecha').value=new Date().toISOString().slice(0,10);_savingVenta=false;const b=document.getElementById('btn-save-v');if(b){b.disabled=false;b.textContent='Registrar venta';}}};
 window.showTabCC=function(t){['ccl','ccn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-cc-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderCuentas();};
 
 // MODAL
@@ -703,6 +704,7 @@ window.quitarHijo=function(id,cId){if(cId==='hijos-container')hijosTemp=hijosTem
 function getHijos(arr){return arr.map(id=>({nombre:document.getElementById('h-n-'+id)?.value||'',fechaNac:document.getElementById('h-f-'+id)?.value||'',talle:document.getElementById('h-t-'+id)?.value||'',genero:document.getElementById('h-g-'+id)?.value||''}));}
 
 window.guardarCliente=async function(){
+  if(_savingCliente)return;
   const nombre=document.getElementById('f-nombre').value.trim();
   const apellido=document.getElementById('f-apellido').value.trim();
   const dni=document.getElementById('f-dni').value.trim();
@@ -711,14 +713,18 @@ window.guardarCliente=async function(){
   if(!dni){toast('El DNI es obligatorio','err');return;}
   if(!tel||tel.length<8){toast('El WhatsApp es obligatorio','err');return;}
   if(clientes.find(c=>c.dni===dni)){toast('Ya existe un cliente con ese DNI','err');return;}
+  _savingCliente=true;
   const btn=document.getElementById('btn-save-cl');
-  if(btn.disabled)return;
   btn.disabled=true;btn.textContent='Guardando...';
   const tel2=limpiarTel(document.getElementById('f-tel2')?.value||'');
   const tel2Desc=document.getElementById('f-tel2desc')?.value.trim()||'';
   const c={nombre,apellido,dni,fnac:document.getElementById('f-fnac').value,tel,tel2,tel2Desc,email:document.getElementById('f-email').value,ciudad:document.getElementById('f-ciudad').value,origen:document.getElementById('f-origen').value,tipo:document.getElementById('f-tipo').value,notas:document.getElementById('f-notas').value,hijos:getHijos(hijosTemp),puntos:0,fechaAlta:new Date().toISOString()};
-  try{const doc=await fsAdd('clientes',c);clientes.unshift(doc);logAccion('cliente','crear',nombre+' '+apellido);limpiarFormCl();toast('Cliente guardado!','ok');showTabCl('lista');}
-  catch(e){btn.disabled=false;btn.textContent='Guardar en la nube';toast('Error al guardar','err');}
+  try{
+    const doc=await fsAdd('clientes',c);clientes.unshift(doc);logAccion('cliente','crear',nombre+' '+apellido);
+    limpiarFormCl();toast('Cliente guardado!','ok');showTabCl('lista');
+  }catch(e){
+    _savingCliente=false;btn.disabled=false;btn.textContent='Guardar en la nube';toast('Error al guardar','err');
+  }
 };
 
 function limpiarFormCl(){
@@ -894,11 +900,12 @@ window.generarCuotas=function(){
 };
 
 window.guardarVenta=async function(){
+  if(_savingVenta)return;
   if(!cliSelVId){toast('Selecciona un cliente','err');return;}
   if(!prodsTemp.length){toast('Agrega al menos un producto','err');return;}
   if(!pagoSel){toast('Selecciona la forma de pago','err');return;}
+  _savingVenta=true;
   const btn=document.getElementById('btn-save-v');
-  if(btn.disabled)return;
   btn.disabled=true;btn.textContent='Registrando...';
   const productos=prodsTemp.map(id=>({desc:document.getElementById('pd-'+id)?.value||'',talle:document.getElementById('pt-'+id)?.value||'',cantidad:parseFloat(document.getElementById('pc-'+id)?.value)||1,precio:parseFloat(document.getElementById('pp-'+id)?.value)||0}));
   const total=window._tv||productos.reduce((t,p)=>t+(p.cantidad*p.precio),0);
@@ -948,9 +955,8 @@ window.guardarVenta=async function(){
     document.getElementById('fiado-unico').style.display='none';document.getElementById('fiado-cuotas').style.display='none';
     document.getElementById('aj-tipo').selectedIndex=0;document.getElementById('aj-valor').value='';
     if(document.getElementById('v-vencimiento'))document.getElementById('v-vencimiento').value='';
-    btn.disabled=false;btn.textContent='Registrar venta';
     toast('Venta registrada!','ok');showTabV('lista');
-  }catch(e){btn.disabled=false;btn.textContent='Registrar venta';toast('Error al registrar venta','err');}
+  }catch(e){_savingVenta=false;btn.disabled=false;btn.textContent='Registrar venta';toast('Error al registrar venta','err');}
 };
 
 function renderVentas(){
@@ -1422,13 +1428,14 @@ function poblarFiltroMes() {
 }
 
 window.guardarGasto = async function() {
+  if(_savingGasto)return;
   const monto = parseFloat(document.getElementById('g-monto').value) || 0;
   const desc = document.getElementById('g-desc').value.trim();
   const fecha = document.getElementById('g-fecha').value;
   if (!monto) { toast('Ingresa un monto', 'err'); return; }
   if (!fecha) { toast('Selecciona una fecha', 'err'); return; }
+  _savingGasto=true;
   const btn = document.getElementById('btn-save-g');
-  if(btn.disabled) return;
   btn.disabled=true; btn.textContent='Guardando...';
   const g = {
     tipo: document.getElementById('g-tipo').value,
@@ -1444,10 +1451,10 @@ window.guardarGasto = async function() {
     ['g-desc','g-monto','g-notas'].forEach(id => document.getElementById(id).value='');
     poblarFiltroMes();
     logAccion('gasto','crear',g.categoria+' '+fmt(g.monto));
-    btn.disabled=false; btn.textContent='Guardar gasto';
+    _savingGasto=false; btn.disabled=false; btn.textContent='Guardar gasto';
     toast('Gasto guardado!', 'ok');
     showTabG('lista');
-  } catch(e) { btn.disabled=false; btn.textContent='Guardar gasto'; toast('Error al guardar', 'err'); }
+  } catch(e) { _savingGasto=false; btn.disabled=false; btn.textContent='Guardar gasto'; toast('Error al guardar', 'err'); }
 };
 
 function renderGastos() {
