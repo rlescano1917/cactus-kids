@@ -144,6 +144,7 @@ textarea{height:60px;resize:vertical}
     <div class="header-right">
       <span class="badge-cloud">En la nube</span>
       <span class="usuario-text" id="usuario-text"></span>
+      <button onclick="abrirCambiarPass()" style="font-size:12px;padding:4px 12px;border-radius:8px;border:0.5px solid #d3d1c7;background:transparent;color:#5f5e5a;cursor:pointer">Cambiar clave</button>
       <button onclick="exportarTodo()" style="font-size:12px;padding:4px 12px;border-radius:8px;border:0.5px solid #5dcaa5;background:#e1f5ee;color:#085041;cursor:pointer">Exportar Excel</button>
       <button class="btn-logout" onclick="doLogout()">Salir</button>
     </div>
@@ -486,7 +487,7 @@ textarea{height:60px;resize:vertical}
 
 <script type="module">
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged,sendPasswordResetEmail,createUserWithEmailAndPassword} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged,sendPasswordResetEmail,createUserWithEmailAndPassword,updatePassword,reauthenticateWithCredential,EmailAuthProvider} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 const FB_CONFIG = {apiKey:"AIzaSyB4MzBpmDKzcQdf7FOjdMQL0Yh8n6QOF6w",authDomain:"cactus-kids-da0b0.firebaseapp.com",projectId:"cactus-kids-da0b0"};
 const auth = getAuth(initializeApp(FB_CONFIG));
@@ -2024,6 +2025,43 @@ window.renderStats = function() {
       }).join('')
     + '</div>'
     + '</div>';
+};
+
+// ==================== CAMBIAR CONTRASEÑA ====================
+window.abrirCambiarPass = function() {
+  abrirModal('<h3>Cambiar contraseña</h3>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Contraseña actual *</label><input id="cp-actual" type="password" style="width:100%"></div></div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Nueva contraseña *</label><input id="cp-nueva" type="password" placeholder="Min. 6 caracteres" style="width:100%"></div></div>'
+    + '<div class="fg full" style="margin-bottom:12px"><div><label>Confirmar nueva contraseña *</label><input id="cp-confirmar" type="password" style="width:100%"></div></div>'
+    + '<div id="cp-error" style="font-size:13px;color:#a32d2d;background:#fcebeb;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:none"></div>'
+    + '<div class="mactions"><button class="btn-save" style="flex:2" id="cp-btn" onclick="guardarCambioPass()">Guardar contraseña</button><button class="btn-close" onclick="cerrarModal()">Cancelar</button></div>');
+};
+
+window.guardarCambioPass = async function() {
+  const actual = document.getElementById('cp-actual').value;
+  const nueva = document.getElementById('cp-nueva').value;
+  const confirmar = document.getElementById('cp-confirmar').value;
+  const errEl = document.getElementById('cp-error');
+  const btn = document.getElementById('cp-btn');
+  errEl.style.display = 'none';
+  if (!actual) { errEl.textContent='Ingresá tu contraseña actual'; errEl.style.display='block'; return; }
+  if (!nueva || nueva.length < 6) { errEl.textContent='La nueva contraseña debe tener al menos 6 caracteres'; errEl.style.display='block'; return; }
+  if (nueva !== confirmar) { errEl.textContent='Las contraseñas no coinciden'; errEl.style.display='block'; return; }
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try {
+    const user = auth.currentUser;
+    const credencial = EmailAuthProvider.credential(user.email, actual);
+    await reauthenticateWithCredential(user, credencial);
+    await updatePassword(user, nueva);
+    toast('Contraseña actualizada!', 'ok');
+    cerrarModal();
+  } catch(e) {
+    btn.disabled = false; btn.textContent = 'Guardar contraseña';
+    const msg = e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential'
+      ? 'La contraseña actual es incorrecta'
+      : 'Error al cambiar la contraseña';
+    errEl.textContent = msg; errEl.style.display = 'block';
+  }
 };
 
 // ==================== EDITAR USUARIO ====================
