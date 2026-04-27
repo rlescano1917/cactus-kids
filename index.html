@@ -224,7 +224,7 @@ textarea{height:60px;resize:vertical}
         <button class="btn-add" onclick="agregarHijo('hijos-container',null)" style="margin-bottom:12px">+ Agregar hijo/a</button>
         <div class="sec-title">Notas</div>
         <div class="fg full"><textarea id="f-notas" placeholder="Preferencias, observaciones..."></textarea></div>
-        <button class="btn-save" onclick="guardarCliente()">Guardar en la nube</button>
+        <button class="btn-save" id="btn-save-cl" onclick="guardarCliente()">Guardar en la nube</button>
       </div>
     </div>
   </div>
@@ -300,7 +300,7 @@ textarea{height:60px;resize:vertical}
         </div>
         <div class="fg full" style="margin-top:8px"><div><label>Fecha</label><input type="date" id="v-fecha"></div></div>
         <div class="fg full"><div><label>Notas (opcional)</label><textarea id="v-notas" placeholder="Observaciones..."></textarea></div></div>
-        <button class="btn-save" onclick="guardarVenta()">Registrar venta</button>
+        <button class="btn-save" id="btn-save-v" onclick="guardarVenta()">Registrar venta</button>
       </div>
     </div>
   </div>
@@ -403,7 +403,7 @@ textarea{height:60px;resize:vertical}
         <div class="fg full">
           <div><label>Notas (opcional)</label><textarea id="g-notas" placeholder="Observaciones..."></textarea></div>
         </div>
-        <button class="btn-save" onclick="guardarGasto()">Guardar gasto</button>
+        <button class="btn-save" id="btn-save-g" onclick="guardarGasto()">Guardar gasto</button>
       </div>
     </div>
 
@@ -711,11 +711,14 @@ window.guardarCliente=async function(){
   if(!dni){toast('El DNI es obligatorio','err');return;}
   if(!tel||tel.length<8){toast('El WhatsApp es obligatorio','err');return;}
   if(clientes.find(c=>c.dni===dni)){toast('Ya existe un cliente con ese DNI','err');return;}
+  const btn=document.getElementById('btn-save-cl');
+  if(btn.disabled)return;
+  btn.disabled=true;btn.textContent='Guardando...';
   const tel2=limpiarTel(document.getElementById('f-tel2')?.value||'');
   const tel2Desc=document.getElementById('f-tel2desc')?.value.trim()||'';
   const c={nombre,apellido,dni,fnac:document.getElementById('f-fnac').value,tel,tel2,tel2Desc,email:document.getElementById('f-email').value,ciudad:document.getElementById('f-ciudad').value,origen:document.getElementById('f-origen').value,tipo:document.getElementById('f-tipo').value,notas:document.getElementById('f-notas').value,hijos:getHijos(hijosTemp),puntos:0,fechaAlta:new Date().toISOString()};
   try{const doc=await fsAdd('clientes',c);clientes.unshift(doc);logAccion('cliente','crear',nombre+' '+apellido);limpiarFormCl();toast('Cliente guardado!','ok');showTabCl('lista');}
-  catch(e){toast('Error al guardar','err');}
+  catch(e){btn.disabled=false;btn.textContent='Guardar en la nube';toast('Error al guardar','err');}
 };
 
 function limpiarFormCl(){
@@ -894,6 +897,9 @@ window.guardarVenta=async function(){
   if(!cliSelVId){toast('Selecciona un cliente','err');return;}
   if(!prodsTemp.length){toast('Agrega al menos un producto','err');return;}
   if(!pagoSel){toast('Selecciona la forma de pago','err');return;}
+  const btn=document.getElementById('btn-save-v');
+  if(btn.disabled)return;
+  btn.disabled=true;btn.textContent='Registrando...';
   const productos=prodsTemp.map(id=>({desc:document.getElementById('pd-'+id)?.value||'',talle:document.getElementById('pt-'+id)?.value||'',cantidad:parseFloat(document.getElementById('pc-'+id)?.value)||1,precio:parseFloat(document.getElementById('pp-'+id)?.value)||0}));
   const total=window._tv||productos.reduce((t,p)=>t+(p.cantidad*p.precio),0);
   const fecha=document.getElementById('v-fecha').value||new Date().toISOString().slice(0,10);
@@ -942,8 +948,9 @@ window.guardarVenta=async function(){
     document.getElementById('fiado-unico').style.display='none';document.getElementById('fiado-cuotas').style.display='none';
     document.getElementById('aj-tipo').selectedIndex=0;document.getElementById('aj-valor').value='';
     if(document.getElementById('v-vencimiento'))document.getElementById('v-vencimiento').value='';
+    btn.disabled=false;btn.textContent='Registrar venta';
     toast('Venta registrada!','ok');showTabV('lista');
-  }catch(e){toast('Error al registrar venta','err');}
+  }catch(e){btn.disabled=false;btn.textContent='Registrar venta';toast('Error al registrar venta','err');}
 };
 
 function renderVentas(){
@@ -1420,6 +1427,9 @@ window.guardarGasto = async function() {
   const fecha = document.getElementById('g-fecha').value;
   if (!monto) { toast('Ingresa un monto', 'err'); return; }
   if (!fecha) { toast('Selecciona una fecha', 'err'); return; }
+  const btn = document.getElementById('btn-save-g');
+  if(btn.disabled) return;
+  btn.disabled=true; btn.textContent='Guardando...';
   const g = {
     tipo: document.getElementById('g-tipo').value,
     categoria: document.getElementById('g-categoria').value,
@@ -1434,9 +1444,10 @@ window.guardarGasto = async function() {
     ['g-desc','g-monto','g-notas'].forEach(id => document.getElementById(id).value='');
     poblarFiltroMes();
     logAccion('gasto','crear',g.categoria+' '+fmt(g.monto));
+    btn.disabled=false; btn.textContent='Guardar gasto';
     toast('Gasto guardado!', 'ok');
     showTabG('lista');
-  } catch(e) { toast('Error al guardar', 'err'); }
+  } catch(e) { btn.disabled=false; btn.textContent='Guardar gasto'; toast('Error al guardar', 'err'); }
 };
 
 function renderGastos() {
