@@ -248,6 +248,7 @@ textarea{height:60px;resize:vertical}
     </div>
     <div id="sec-v-nuevo" class="section">
       <div class="card">
+        <div class="fg full"><div><label>Fecha</label><input type="date" id="v-fecha"></div></div>
         <div class="sec-title">Cliente</div>
         <div class="fg full"><div><label>Buscar cliente</label><input type="text" id="bus-cli-v" placeholder="Escribi el nombre..." oninput="buscarCliV()"></div></div>
         <div id="res-cli-v" style="margin-bottom:12px"></div>
@@ -302,7 +303,6 @@ textarea{height:60px;resize:vertical}
             </div>
           </div>
         </div>
-        <div class="fg full" style="margin-top:8px"><div><label>Fecha</label><input type="date" id="v-fecha"></div></div>
         <div class="fg full"><div><label>Notas (opcional)</label><textarea id="v-notas" placeholder="Observaciones..."></textarea></div></div>
         <button class="btn-save" id="btn-save-v" onclick="guardarVenta()">Registrar venta</button>
       </div>
