@@ -1025,6 +1025,8 @@ window.anularVenta=async function(id){
         const movs=[...(cuenta.movimientos||[]),{tipo:'pago',monto:v.total||0,desc:'Reverso por anulación de venta',fecha:fechaAnulacion,id:Date.now()}];
         await fsPatch('cuentas',cuenta.id,{clienteId:cuenta.clienteId,clienteNombre:cuenta.clienteNombre,movimientos:movs,fechaCreacion:cuenta.fechaCreacion||''});
         cuentas=cuentas.map(c=>c.id===cuenta.id?{...c,movimientos:movs}:c);
+      }else{
+        toast('Venta anulada, pero no se encontró la cuenta corriente del cliente para revertir el saldo.','err');
       }
     }
     logAccion('venta','anular',(v.clienteNombre||'')+' '+fmt(v.total||0)+' · Motivo: '+motivo);
