@@ -825,9 +825,14 @@ window.guardarEdicion=async function(id){
 window.eliminarCliente=async function(id){
   if(rolActual!=='admin'){toast('Solo el administrador puede eliminar clientes','err');return;}
   const cliDel=clientes.find(c=>c.id===id);
-  const motivo=await pedirMotivo('Vas a eliminar a '+( cliDel?.nombre||'')+' '+(cliDel?.apellido||''));
+  const cuentaCli=cuentas.find(c=>c.clienteId===id);
+  const deuda=cuentaCli?saldo(cuentaCli):0;
+  if(deuda>0){
+    if(!confirm('⚠️ '+( cliDel?.nombre||'')+' tiene una deuda pendiente de '+fmt(deuda)+'.\n¿Seguro que querés eliminarlo de todas formas?'))return;
+  }
+  const motivo=await pedirMotivo('Vas a eliminar a '+(cliDel?.nombre||'')+' '+(cliDel?.apellido||''));
   if(!motivo)return;
-  try{await fsDel('clientes',id);clientes=clientes.filter(c=>c.id!==id);logAccion('cliente','eliminar',(cliDel?.nombre||'')+' '+(cliDel?.apellido||'')+' · Motivo: '+motivo);cerrarModal();renderClientes();toast('Cliente eliminado','ok');}
+  try{await fsDel('clientes',id);clientes=clientes.filter(c=>c.id!==id);logAccion('cliente','eliminar',(cliDel?.nombre||'')+' '+(cliDel?.apellido||'')+' · Motivo: '+motivo+(deuda>0?' · Deuda pendiente: '+fmt(deuda):''));cerrarModal();renderClientes();toast('Cliente eliminado','ok');}
   catch(e){toast('Error al eliminar','err');}
 };
 
