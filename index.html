@@ -881,6 +881,7 @@ window.selPago=function(tipo){
   pagoSel=tipo;
   ['efectivo','transferencia','tarjeta','fiado'].forEach(t=>document.getElementById('pb-'+t).className='pago-btn'+(tipo===t?' sel-'+t:''));
   document.getElementById('alerta-fiado').style.display=tipo==='fiado'?'block':'none';
+  if(tipo==='fiado')setModalidad('unico');
 };
 
 window.setModalidad=function(m){
@@ -998,17 +999,20 @@ window.eliminarVenta=async function(id){
 // ==================== CUENTAS CORRIENTES ====================
 function saldo(c){return(c.movimientos||[]).reduce((t,m)=>m.tipo==='cargo'?t+m.monto:t-m.monto,0);}
 
+// Parsea "YYYY-MM-DD" como medianoche local (evita el desfase UTC en Argentina)
+function fechaLocal(str){const[y,mo,d]=str.split('-').map(Number);return new Date(y,mo-1,d);}
+
 function estadoCuenta(c){
   const s=saldo(c);if(s<=0)return'saldado';
   const hoy=new Date();hoy.setHours(0,0,0,0);
   const cargos=(c.movimientos||[]).filter(m=>m.tipo==='cargo'&&m.vencimiento);
   if(!cargos.length)return'aldia';
   let minD=999;
-  for(const m of cargos){const d=Math.ceil((new Date(m.vencimiento)-hoy)/(1000*60*60*24));if(d<minD)minD=d;}
+  for(const m of cargos){const d=Math.ceil((fechaLocal(m.vencimiento)-hoy)/(1000*60*60*24));if(d<minD)minD=d;}
   if(minD<0)return'vencida';if(minD<=7)return'porVencer';return'aldia';
 }
-function diasVencida(c){const hoy=new Date();hoy.setHours(0,0,0,0);let max=0;for(const m of(c.movimientos||[])){if(m.tipo!=='cargo'||!m.vencimiento)continue;const d=Math.ceil((hoy-new Date(m.vencimiento))/(1000*60*60*24));if(d>max)max=d;}return max;}
-function diasParaVencer(c){const hoy=new Date();hoy.setHours(0,0,0,0);let min=999;for(const m of(c.movimientos||[])){if(m.tipo!=='cargo'||!m.vencimiento)continue;const d=Math.ceil((new Date(m.vencimiento)-hoy)/(1000*60*60*24));if(d>=0&&d<min)min=d;}return min;}
+function diasVencida(c){const hoy=new Date();hoy.setHours(0,0,0,0);let max=0;for(const m of(c.movimientos||[])){if(m.tipo!=='cargo'||!m.vencimiento)continue;const d=Math.ceil((hoy-fechaLocal(m.vencimiento))/(1000*60*60*24));if(d>max)max=d;}return max;}
+function diasParaVencer(c){const hoy=new Date();hoy.setHours(0,0,0,0);let min=999;for(const m of(c.movimientos||[])){if(m.tipo!=='cargo'||!m.vencimiento)continue;const d=Math.ceil((fechaLocal(m.vencimiento)-hoy)/(1000*60*60*24));if(d>=0&&d<min)min=d;}return min;}
 
 window.setFiltroCC=function(f,el){filtroCC=f;document.querySelectorAll('#sec-cc-lista .filtro').forEach(b=>b.classList.remove('active'));el.classList.add('active');renderCuentas();};
 
@@ -1069,7 +1073,7 @@ window.verCuenta=function(id){
   const movsHtml=movs.length?movs.map(m=>{
     let vb='';
     if(m.tipo==='cargo'&&m.vencimiento){
-      const diff=Math.ceil((new Date(m.vencimiento)-hoy)/(1000*60*60*24));
+      const diff=Math.ceil((fechaLocal(m.vencimiento)-hoy)/(1000*60*60*24));
       if(diff<0)vb='<span class="vbadge vencida">Vencio hace '+Math.abs(diff)+'d</span>';
       else if(diff<=7)vb='<span class="vbadge porVencer">Vence en '+diff+'d</span>';
       else vb='<span class="vbadge aldia">Vence '+m.vencimiento+'</span>';
@@ -1125,14 +1129,14 @@ window.calcularMora=function(cuentaId){
   const box=document.getElementById('mora-box');
   if(!c||!box)return;
   const hoy=new Date();hoy.setHours(0,0,0,0);
-  const vencidos=(c.movimientos||[]).filter(m=>m.tipo==='cargo'&&m.vencimiento&&new Date(m.vencimiento)<hoy);
+  const vencidos=(c.movimientos||[]).filter(m=>m.tipo==='cargo'&&m.vencimiento&&fechaLocal(m.vencimiento)<hoy);
   if(!vencidos.length){box.innerHTML='';return;}
   let totalMora=0;
   const wrap=document.createElement('div');
   wrap.style.cssText='background:#fcebeb;border:0.5px solid #f09595;border-radius:8px;padding:0.75rem 1rem;margin-bottom:0.5rem';
   wrap.innerHTML='<div style="font-size:13px;font-weight:500;color:#791f1f;margin-bottom:6px">Mora calculada (20% mensual)</div>';
   for(const m of vencidos){
-    const dias=Math.ceil((hoy-new Date(m.vencimiento))/(1000*60*60*24));
+    const dias=Math.ceil((hoy-fechaLocal(m.vencimiento))/(1000*60*60*24));
     const mora=Math.round(m.monto*0.20*(dias/30));
     totalMora+=mora;
     const row=document.createElement('div');
