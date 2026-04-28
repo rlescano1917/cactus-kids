@@ -884,8 +884,9 @@ window.calcTotal=function(){
   const total=Math.max(0,sub+ajM);
   const lbl=document.getElementById('aj-label');const sl=document.getElementById('subtotal-label');
   if(lbl)lbl.textContent=ajL;if(sl)sl.textContent=ajM!==0?'Subtotal: '+fmt(sub):'';
-  document.getElementById('total-venta').textContent=fmt(total);
-  window._tv=total;window._ajL=ajL;
+  const totalR=Math.round(total);
+  document.getElementById('total-venta').textContent=fmt(totalR);
+  window._tv=totalR;window._ajL=ajL;
 };
 
 window.selPago=function(tipo){
