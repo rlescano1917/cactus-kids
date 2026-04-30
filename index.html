@@ -275,34 +275,9 @@ textarea{height:60px;resize:vertical}
           <strong id="total-venta">$0</strong>
         </div>
         <div class="sec-title">Forma de pago</div>
-        <div class="pago-btns">
-          <button class="pago-btn" id="pb-efectivo" onclick="selPago('efectivo')">Efectivo</button>
-          <button class="pago-btn" id="pb-transferencia" onclick="selPago('transferencia')">Transferencia</button>
-          <button class="pago-btn" id="pb-tarjeta" onclick="selPago('tarjeta')">Tarjeta</button>
-          <button class="pago-btn" id="pb-fiado" onclick="selPago('fiado')">Fiado</button>
-        </div>
-        <div class="alerta" id="alerta-fiado">
-          <strong>Venta a credito / fiado</strong>
-          <span>Se registra en la cuenta corriente del cliente.</span>
-          <div style="margin-top:12px">
-            <label style="font-size:12px;color:#a32d2d;display:block;margin-bottom:6px">Modalidad de pago</label>
-            <div style="display:flex;gap:8px;margin-bottom:12px">
-              <button id="mod-unico" onclick="setModalidad('unico')" style="flex:1;padding:8px;font-size:13px;font-weight:500;border-radius:8px;border:0.5px solid #f09595;background:#fff;color:#a32d2d;cursor:pointer">Pago unico</button>
-              <button id="mod-cuotas" onclick="setModalidad('cuotas')" style="flex:1;padding:8px;font-size:13px;font-weight:500;border-radius:8px;border:0.5px solid #f09595;background:#fff;color:#a32d2d;cursor:pointer">En cuotas</button>
-            </div>
-            <div id="fiado-unico" style="display:none">
-              <label style="font-size:12px;color:#a32d2d;display:block;margin-bottom:4px">Fecha de vencimiento</label>
-              <input type="date" id="v-vencimiento" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #f09595;border-radius:8px;background:#fff">
-            </div>
-            <div id="fiado-cuotas" style="display:none">
-              <div class="fg">
-                <div><label style="color:#a32d2d">Cant. de cuotas</label><input type="number" id="v-ncuotas" min="2" max="24" value="2" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #f09595;border-radius:8px;background:#fff" oninput="generarCuotas()"></div>
-                <div><label style="color:#a32d2d">Primera cuota</label><input type="date" id="v-primera-cuota" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #f09595;border-radius:8px;background:#fff" oninput="generarCuotas()"></div>
-              </div>
-              <div id="cuotas-detalle" style="font-size:13px;color:#a32d2d"></div>
-            </div>
-          </div>
-        </div>
+        <div id="pagos-container"></div>
+        <button class="btn-add" onclick="agregarPago()" style="margin-bottom:8px">+ Agregar forma de pago</button>
+        <div id="pagos-restante" style="display:none;font-size:13px;padding:8px 12px;border-radius:8px;margin-bottom:8px"></div>
         <div class="fg full"><div><label>Notas (opcional)</label><textarea id="v-notas" placeholder="Observaciones..."></textarea></div></div>
         <button class="btn-save" id="btn-save-v" onclick="guardarVenta()">Registrar venta</button>
       </div>
@@ -505,7 +480,7 @@ let filtroCl='todos', filtroCC='todos', filtroSol='todas';
 let _savingCliente=false, _savingVenta=false, _savingGasto=false;
 let cliSelVId=null, cliSelVNombre='';
 let cliSelCCId=null, cliSelCCNombre='';
-let pagoSel=null, modalidadFiado='unico';
+let pagosTemp=[];
 
 // ROLES: el Display Name en Firebase determina el rol
 // Admin: displayName = 'admin' O email = rlescano1917@gmail.com
@@ -675,7 +650,7 @@ window.showTabV=function(t){
   ['lista','anuladas','nuevo'].forEach(s=>{document.getElementById('sec-v-'+s).classList.toggle('active',s===t);});
   if(t==='lista')renderVentas();
   if(t==='anuladas')renderAnuladas();
-  if(t==='nuevo'){document.getElementById('v-fecha').value=new Date().toISOString().slice(0,10);_savingVenta=false;const b=document.getElementById('btn-save-v');if(b){b.disabled=false;b.textContent='Registrar venta';}}
+  if(t==='nuevo'){document.getElementById('v-fecha').value=new Date().toISOString().slice(0,10);_savingVenta=false;pagosTemp=[];document.getElementById('pagos-container').innerHTML='';document.getElementById('pagos-restante').style.display='none';const b=document.getElementById('btn-save-v');if(b){b.disabled=false;b.textContent='Registrar venta';}}
 };
 window.showTabCC=function(t){['ccl','ccn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-cc-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderCuentas();};
 
@@ -887,99 +862,160 @@ window.calcTotal=function(){
   const totalR=Math.round(total);
   document.getElementById('total-venta').textContent=fmt(totalR);
   window._tv=totalR;window._ajL=ajL;
+  actualizarRestante();
 };
 
-window.selPago=function(tipo){
-  pagoSel=tipo;
-  ['efectivo','transferencia','tarjeta','fiado'].forEach(t=>document.getElementById('pb-'+t).className='pago-btn'+(tipo===t?' sel-'+t:''));
-  document.getElementById('alerta-fiado').style.display=tipo==='fiado'?'block':'none';
-  if(tipo==='fiado')setModalidad('unico');
+window.agregarPago=function(){
+  const id=Date.now()+Math.floor(Math.random()*1000);
+  pagosTemp.push({id,tipo:null,modalidad:'unico'});
+  const cont=document.getElementById('pagos-container');
+  const div=document.createElement('div');
+  div.className='prod-card';div.id='pago-'+id;
+  div.innerHTML='<button class="rm" onclick="quitarPago('+id+')">x</button>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'
+    +'<button class="pago-btn" id="ptef-'+id+'" onclick="setPagoTipo('+id+',\'efectivo\')">Efectivo</button>'
+    +'<button class="pago-btn" id="pttr-'+id+'" onclick="setPagoTipo('+id+',\'transferencia\')">Transferencia</button>'
+    +'<button class="pago-btn" id="ptta-'+id+'" onclick="setPagoTipo('+id+',\'tarjeta\')">Tarjeta</button>'
+    +'<button class="pago-btn" id="ptfi-'+id+'" onclick="setPagoTipo('+id+',\'fiado\')">Fiado</button>'
+    +'</div>'
+    +'<div><label style="font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px">Monto ($)</label>'
+    +'<input type="number" id="pm-'+id+'" placeholder="0" min="0" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px" oninput="actualizarRestante()"></div>'
+    +'<div id="pago-fiado-'+id+'" style="display:none;margin-top:10px;background:#fff0f0;border-radius:8px;padding:10px">'
+    +'<label style="font-size:12px;color:#a32d2d;font-weight:500;display:block;margin-bottom:8px">Configurar fiado</label>'
+    +'<div style="display:flex;gap:8px;margin-bottom:10px">'
+    +'<button id="pmodu-'+id+'" onclick="setPagoModalidad('+id+',\'unico\')" style="flex:1;padding:7px;font-size:12px;font-weight:500;border-radius:8px;border:0.5px solid #f09595;background:#fcebeb;color:#a32d2d;cursor:pointer">Pago unico</button>'
+    +'<button id="pmodc-'+id+'" onclick="setPagoModalidad('+id+',\'cuotas\')" style="flex:1;padding:7px;font-size:12px;font-weight:500;border-radius:8px;border:0.5px solid #f09595;background:#fff;color:#a32d2d;cursor:pointer">En cuotas</button>'
+    +'</div>'
+    +'<div id="pfu-'+id+'">'
+    +'<label style="font-size:12px;color:#a32d2d;display:block;margin-bottom:4px">Vencimiento</label>'
+    +'<input type="date" id="pv-'+id+'" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #f09595;border-radius:8px;background:#fff">'
+    +'</div>'
+    +'<div id="pfc-'+id+'" style="display:none">'
+    +'<div class="fg"><div><label style="color:#a32d2d;font-size:12px">Cant. cuotas</label><input type="number" id="pnc-'+id+'" min="2" max="24" value="2" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #f09595;border-radius:8px;background:#fff" oninput="generarCuotasPago('+id+')"></div>'
+    +'<div><label style="color:#a32d2d;font-size:12px">Primera cuota</label><input type="date" id="ppc-'+id+'" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #f09595;border-radius:8px;background:#fff" oninput="generarCuotasPago('+id+')"></div></div>'
+    +'<div id="pcd-'+id+'" style="font-size:12px;color:#a32d2d;margin-top:6px"></div>'
+    +'</div>'
+    +'</div>';
+  cont.appendChild(div);
+  actualizarRestante();
 };
 
-window.setModalidad=function(m){
-  modalidadFiado=m;
-  document.getElementById('fiado-unico').style.display=m==='unico'?'block':'none';
-  document.getElementById('fiado-cuotas').style.display=m==='cuotas'?'block':'none';
-  document.getElementById('mod-unico').style.background=m==='unico'?'#fcebeb':'#fff';
-  document.getElementById('mod-cuotas').style.background=m==='cuotas'?'#fcebeb':'#fff';
-  if(m==='cuotas')generarCuotas();
-  if(m==='unico'){
-    const d = new Date();
-    d.setDate(d.getDate()+30);
-    const venc = document.getElementById('v-vencimiento');
-    if(venc) venc.value = d.toISOString().slice(0,10);
+window.quitarPago=function(id){
+  pagosTemp=pagosTemp.filter(p=>p.id!==id);
+  document.getElementById('pago-'+id).remove();
+  actualizarRestante();
+};
+
+window.setPagoTipo=function(id,tipo){
+  const p=pagosTemp.find(x=>x.id===id);if(!p)return;
+  p.tipo=tipo;
+  const map={efectivo:'ef',transferencia:'tr',tarjeta:'ta',fiado:'fi'};
+  Object.entries({ef:'efectivo',tr:'transferencia',ta:'tarjeta',fi:'fiado'}).forEach(([s,t])=>{
+    const b=document.getElementById('pt'+s+'-'+id);if(b)b.className='pago-btn'+(tipo===t?' sel-'+t:'');
+  });
+  const fd=document.getElementById('pago-fiado-'+id);
+  if(fd){fd.style.display=tipo==='fiado'?'block':'none';
+    if(tipo==='fiado'){const d=new Date();d.setDate(d.getDate()+30);const venc=document.getElementById('pv-'+id);if(venc&&!venc.value)venc.value=d.toISOString().slice(0,10);}
   }
 };
 
-window.generarCuotas=function(){
-  const n=parseInt(document.getElementById('v-ncuotas')?.value)||2;
-  const primera=document.getElementById('v-primera-cuota')?.value;
-  const det=document.getElementById('cuotas-detalle');
+window.setPagoModalidad=function(id,mod){
+  const p=pagosTemp.find(x=>x.id===id);if(p)p.modalidad=mod;
+  document.getElementById('pfu-'+id).style.display=mod==='unico'?'block':'none';
+  document.getElementById('pfc-'+id).style.display=mod==='cuotas'?'block':'none';
+  document.getElementById('pmodu-'+id).style.background=mod==='unico'?'#fcebeb':'#fff';
+  document.getElementById('pmodc-'+id).style.background=mod==='cuotas'?'#fcebeb':'#fff';
+  if(mod==='cuotas')generarCuotasPago(id);
+};
+
+window.generarCuotasPago=function(id){
+  const n=parseInt(document.getElementById('pnc-'+id)?.value)||2;
+  const primera=document.getElementById('ppc-'+id)?.value;
+  const det=document.getElementById('pcd-'+id);
+  const monto=parseFloat(document.getElementById('pm-'+id)?.value)||0;
   if(!primera||!det)return;
-  const total=window._tv||0;
-  const monto=Math.round(total/n);const montoU=total-(monto*(n-1));
-  let html='<div style="margin-top:8px">';
-  for(let i=0;i<n;i++){const f=new Date(primera+'T00:00:00');f.setMonth(f.getMonth()+i);const fs=f.toISOString().slice(0,10);const m=i===n-1?montoU:monto;html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:0.5px solid #f09595;font-size:12px"><span>Cuota '+(i+1)+'/'+n+' · '+fs+'</span><span style="font-weight:500">'+fmt(m)+'</span></div>';}
+  const mc=Math.round(monto/n);const mu=monto-(mc*(n-1));
+  let html='<div style="margin-top:4px">';
+  for(let i=0;i<n;i++){const f=new Date(primera+'T00:00:00');f.setMonth(f.getMonth()+i);const fs=f.toISOString().slice(0,10);const m=i===n-1?mu:mc;html+='<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:0.5px solid #f09595;font-size:11px"><span>Cuota '+(i+1)+'/'+n+' · '+fs+'</span><span style="font-weight:500">'+fmt(m)+'</span></div>';}
   det.innerHTML=html+'</div>';
+};
+
+window.actualizarRestante=function(){
+  const total=window._tv||0;
+  const asignado=pagosTemp.reduce((t,p)=>t+(parseFloat(document.getElementById('pm-'+p.id)?.value)||0),0);
+  const restante=total-asignado;
+  const el=document.getElementById('pagos-restante');
+  if(!el)return;
+  if(!total||!pagosTemp.length){el.style.display='none';return;}
+  el.style.display='block';
+  if(restante===0){el.style.cssText='display:block;font-size:13px;padding:8px 12px;border-radius:8px;margin-bottom:8px;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5';el.textContent='Total cubierto';}
+  else if(restante>0){el.style.cssText='display:block;font-size:13px;padding:8px 12px;border-radius:8px;margin-bottom:8px;background:#faeeda;color:#633806;border:0.5px solid #fac775';el.textContent='Falta asignar: '+fmt(restante);}
+  else{el.style.cssText='display:block;font-size:13px;padding:8px 12px;border-radius:8px;margin-bottom:8px;background:#fcebeb;color:#a32d2d;border:0.5px solid #f09595';el.textContent='Excede el total en: '+fmt(Math.abs(restante));}
 };
 
 window.guardarVenta=async function(){
   if(_savingVenta)return;
   if(!cliSelVId){toast('Selecciona un cliente','err');return;}
   if(!prodsTemp.length){toast('Agrega al menos un producto','err');return;}
-  if(!pagoSel){toast('Selecciona la forma de pago','err');return;}
+  if(!pagosTemp.length){toast('Agrega al menos una forma de pago','err');return;}
+  const sinTipo=pagosTemp.find(p=>!p.tipo);
+  if(sinTipo){toast('Selecciona el tipo en cada forma de pago','err');return;}
+  const total=window._tv||0;
+  const asignado=pagosTemp.reduce((t,p)=>t+(parseFloat(document.getElementById('pm-'+p.id)?.value)||0),0);
+  if(asignado!==total){toast('El total de los pagos ('+fmt(asignado)+') no coincide con el total de la venta ('+fmt(total)+')','err');return;}
   _savingVenta=true;
   const btn=document.getElementById('btn-save-v');
   btn.disabled=true;btn.textContent='Registrando...';
   const productos=prodsTemp.map(id=>({desc:document.getElementById('pd-'+id)?.value||'',talle:document.getElementById('pt-'+id)?.value||'',cantidad:parseFloat(document.getElementById('pc-'+id)?.value)||1,precio:parseFloat(document.getElementById('pp-'+id)?.value)||0}));
-  const total=window._tv||productos.reduce((t,p)=>t+(p.cantidad*p.precio),0);
   const fecha=document.getElementById('v-fecha').value||new Date().toISOString().slice(0,10);
-  const venta={clienteId:cliSelVId,clienteNombre:cliSelVNombre,productos,total,ajuste:window._ajL||'',formaPago:pagoSel,notas:document.getElementById('v-notas').value,fecha,fechaCreacion:new Date().toISOString()};
+  const pagos=pagosTemp.map(p=>({tipo:p.tipo,monto:parseFloat(document.getElementById('pm-'+p.id)?.value)||0,modalidad:p.modalidad||'unico',vencimiento:document.getElementById('pv-'+p.id)?.value||'',ncuotas:parseInt(document.getElementById('pnc-'+p.id)?.value)||2,primeraC:document.getElementById('ppc-'+p.id)?.value||''}));
+  const tiposUnicos=[...new Set(pagos.map(p=>p.tipo))];
+  const formaPago=tiposUnicos.length===1?tiposUnicos[0]:'mixto';
+  const venta={clienteId:cliSelVId,clienteNombre:cliSelVNombre,productos,total,ajuste:window._ajL||'',formaPago,pagos,notas:document.getElementById('v-notas').value,fecha,fechaCreacion:new Date().toISOString()};
   try{
-    const doc=await fsAdd('ventas',venta);ventas.unshift(doc);logAccion('venta','crear',cliSelVNombre+' '+fmt(total)+' '+pagoSel);
-    // Sumar puntos: 1 punto por cada $1000 gastados (solo ventas no fiado)
-    if(pagoSel!=='fiado'){
-      const ptsGanados=Math.floor(total/1000);
+    const doc=await fsAdd('ventas',venta);ventas.unshift(doc);
+    const resumenPagos=pagos.map(p=>fmt(p.monto)+' '+p.tipo).join(' + ');
+    logAccion('venta','crear',cliSelVNombre+' '+fmt(total)+' · '+resumenPagos);
+    // Puntos: solo por el monto no fiado
+    const montoNoFiado=pagos.filter(p=>p.tipo!=='fiado').reduce((t,p)=>t+p.monto,0);
+    if(montoNoFiado>0){
+      const ptsGanados=Math.floor(montoNoFiado/1000);
       if(ptsGanados>0){
         const cli=clientes.find(c=>c.id===cliSelVId);
         if(cli){
-          const ptsAntes=cli.puntos||0;
-          const ptsDespues=ptsAntes+ptsGanados;
-          await fsPatch('clientes',cliSelVId,{puntos:ptsDespues});
-          cli.puntos=ptsDespues;
+          const ptsAntes=cli.puntos||0;const ptsDespues=ptsAntes+ptsGanados;
+          await fsPatch('clientes',cliSelVId,{puntos:ptsDespues});cli.puntos=ptsDespues;
           const descuento=Math.floor(ptsDespues/10);
-          if(descuento>Math.floor(ptsAntes/10)){
-            toast('Venta registrada! '+cliSelVNombre+' tiene '+ptsDespues+' pts y puede canjear $500!','ok');
-          } else {
-            toast('Venta registrada! '+cliSelVNombre+' gano '+ptsGanados+' pts. Total: '+ptsDespues+' pts','ok');
-          }
-      }}
+          if(descuento>Math.floor(ptsAntes/10)){toast('Venta registrada! '+cliSelVNombre+' tiene '+ptsDespues+' pts y puede canjear $500!','ok');}
+          else{toast('Venta registrada! '+cliSelVNombre+' gano '+ptsGanados+' pts. Total: '+ptsDespues+' pts','ok');}
+        }
+      }
     }
-
-    if(pagoSel==='fiado'){
+    // Fiado: crear movimientos por cada pago fiado
+    const pagosFiado=pagos.filter(p=>p.tipo==='fiado');
+    if(pagosFiado.length){
       let cuenta=cuentas.find(c=>c.clienteId===cliSelVId);
       const descBase='Venta '+(productos.map(p=>p.desc).join(', ')).substring(0,40);
       let nuevosMovs=[];
-      if(modalidadFiado==='cuotas'){
-        const n=parseInt(document.getElementById('v-ncuotas').value)||2;
-        const primera=document.getElementById('v-primera-cuota').value;
-        const mc=Math.round(total/n);const mu=total-(mc*(n-1));
-        for(let i=0;i<n;i++){const f=new Date(primera+'T00:00:00');f.setMonth(f.getMonth()+i);nuevosMovs.push({tipo:'cargo',monto:i===n-1?mu:mc,desc:descBase+' (cuota '+(i+1)+'/'+n+')',fecha,vencimiento:f.toISOString().slice(0,10),id:Date.now()+i});}
-      } else {
-        nuevosMovs.push({tipo:'cargo',monto:total,desc:descBase,fecha,vencimiento:document.getElementById('v-vencimiento').value||'',id:Date.now()});
+      for(const pf of pagosFiado){
+        if(pf.modalidad==='cuotas'&&pf.ncuotas>=2&&pf.primeraC){
+          const n=pf.ncuotas;const mc=Math.round(pf.monto/n);const mu=pf.monto-(mc*(n-1));
+          for(let i=0;i<n;i++){const f=new Date(pf.primeraC+'T00:00:00');f.setMonth(f.getMonth()+i);nuevosMovs.push({tipo:'cargo',monto:i===n-1?mu:mc,desc:descBase+(pagosFiado.length>1?' (fiado parcial)':'')+' (cuota '+(i+1)+'/'+n+')',fecha,vencimiento:f.toISOString().slice(0,10),id:Date.now()+i+Math.random()});}
+        } else {
+          nuevosMovs.push({tipo:'cargo',monto:pf.monto,desc:descBase+(pagosFiado.length>1?' (fiado parcial)':''),fecha,vencimiento:pf.vencimiento||'',id:Date.now()+Math.random()});
+        }
       }
       if(cuenta){const movs=[...(cuenta.movimientos||[]),...nuevosMovs];await fsPatch('cuentas',cuenta.id,{clienteId:cuenta.clienteId,clienteNombre:cuenta.clienteNombre,movimientos:movs,fechaCreacion:cuenta.fechaCreacion||''});cuenta.movimientos=movs;}
       else{const nc=await fsAdd('cuentas',{clienteId:cliSelVId,clienteNombre:cliSelVNombre,movimientos:nuevosMovs,fechaCreacion:new Date().toISOString()});cuentas.unshift(nc);}
     }
-    cliSelVId=null;cliSelVNombre='';pagoSel=null;prodsTemp=[];modalidadFiado='unico';window._tv=0;window._ajL='';
+    cliSelVId=null;cliSelVNombre='';pagosTemp=[];prodsTemp=[];window._tv=0;window._ajL='';
     document.getElementById('bus-cli-v').value='';document.getElementById('cli-sel-v').style.display='none';
     document.getElementById('prods-container').innerHTML='';document.getElementById('total-venta').textContent='$0';
-    document.getElementById('v-notas').value='';document.getElementById('alerta-fiado').style.display='none';
-    ['efectivo','transferencia','tarjeta','fiado'].forEach(t=>document.getElementById('pb-'+t).className='pago-btn');
-    document.getElementById('fiado-unico').style.display='none';document.getElementById('fiado-cuotas').style.display='none';
+    document.getElementById('pagos-container').innerHTML='';document.getElementById('pagos-restante').style.display='none';
+    document.getElementById('v-notas').value='';
     document.getElementById('aj-tipo').selectedIndex=0;document.getElementById('aj-valor').value='';
-    if(document.getElementById('v-vencimiento'))document.getElementById('v-vencimiento').value='';
-    toast('Venta registrada!','ok');showTabV('lista');
+    if(!document.getElementById('toast').textContent.includes('pts'))toast('Venta registrada!','ok');
+    showTabV('lista');
   }catch(e){_savingVenta=false;btn.disabled=false;btn.textContent='Registrar venta';toast('Error al registrar venta','err');}
 };
 
@@ -992,7 +1028,7 @@ function renderVentas(){
   const f=activas.filter(v=>(v.clienteNombre+' '+(v.formaPago||'')).toLowerCase().includes(q));
   f.sort((a,b)=>new Date(b.fechaCreacion)-new Date(a.fechaCreacion));
   if(!f.length){el.innerHTML='<div style="text-align:center;padding:2rem;color:#5f5e5a;font-size:14px">No hay ventas.</div>';return;}
-  el.innerHTML=f.map(v=>{const ini=(v.clienteNombre||'??').split(' ').map(p=>p[0]||'').slice(0,2).join('').toUpperCase();const nP=v.productos?.length||0;return'<div class="row" onclick="verVenta(\''+v.id+'\')"><div class="avatar">'+ini+'</div><div class="info"><strong>'+v.clienteNombre+'</strong><span>'+v.fecha+' · '+nP+' producto'+(nP!==1?'s':'')+'</span></div><div style="display:flex;gap:6px;align-items:center;flex-shrink:0"><span class="badge '+(v.formaPago||'efectivo')+'">'+(v.formaPago||'efectivo')+'</span><span style="font-size:15px;font-weight:500">'+fmt(v.total||0)+'</span></div></div>';}).join('');
+  el.innerHTML=f.map(v=>{const ini=(v.clienteNombre||'??').split(' ').map(p=>p[0]||'').slice(0,2).join('').toUpperCase();const nP=v.productos?.length||0;const fp=v.formaPago||'efectivo';const badgeCls=fp==='mixto'?'':fp;const badgeTxt=fp==='mixto'?'Mixto':fp;return'<div class="row" onclick="verVenta(\''+v.id+'\')"><div class="avatar">'+ini+'</div><div class="info"><strong>'+v.clienteNombre+'</strong><span>'+v.fecha+' · '+nP+' producto'+(nP!==1?'s':'')+'</span></div><div style="display:flex;gap:6px;align-items:center;flex-shrink:0"><span class="badge '+badgeCls+'">'+badgeTxt+'</span><span style="font-size:15px;font-weight:500">'+fmt(v.total||0)+'</span></div></div>';}).join('');
 }
 
 window.verVenta=function(id){
@@ -1000,7 +1036,8 @@ window.verVenta=function(id){
   const prods=v.productos?.length?v.productos.map(p=>'<div style="background:#f1efe8;border-radius:8px;padding:8px;margin-bottom:6px;font-size:13px;display:flex;justify-content:space-between"><span>'+(p.desc||'—')+(p.talle?' · '+p.talle:'')+' x'+(p.cantidad||1)+'</span><span style="font-weight:500">'+fmt((p.precio||0)*(p.cantidad||1))+'</span></div>').join(''):'<span style="font-size:13px;color:#5f5e5a">Sin detalle</span>';
   const yaAnulada=v.estado==='anulada';
   const anulInfo=yaAnulada?'<div style="background:#fcebeb;border:0.5px solid #f09595;border-radius:8px;padding:10px 14px;margin-bottom:12px"><strong style="font-size:13px;color:#791f1f">Venta anulada</strong><div style="font-size:12px;color:#a32d2d;margin-top:2px">'+val(v.fechaAnulacion)+' · Por '+(v.anuladaPor||'—')+'</div><div style="font-size:12px;color:#a32d2d;margin-top:2px">Motivo: '+(v.motivoAnulacion||'—')+'</div></div>':'';
-  abrirModal('<h3>Venta a '+v.clienteNombre+'</h3>'+anulInfo+'<div class="mf"><span>Fecha</span>'+val(v.fecha)+'</div>'+'<div class="mf"><span>Forma de pago</span>'+(v.formaPago||'—')+'</div>'+(v.ajuste?'<div class="mf"><span>Ajuste</span>'+v.ajuste+'</div>':'')+'<div class="mf"><span>Productos</span>'+prods+'</div>'+'<div style="background:#1a1a18;border-radius:8px;padding:0.75rem 1rem;margin:0.75rem 0;display:flex;justify-content:space-between;align-items:center"><span style="color:#f1efe8;font-size:14px">Total</span><span style="color:#fff;font-size:18px;font-weight:500">'+fmt(v.total||0)+'</span></div>'+'<div class="mf"><span>Notas</span>'+val(v.notas)+'</div>'+'<div class="mactions">'+(!yaAnulada?'<button class="btn-del" style="background:#faeeda;color:#633806;border-color:#fac775" onclick="anularVenta(\''+v.id+'\')">Anular</button>':'')+(rolActual==='admin'&&!yaAnulada?'<button class="btn-del" onclick="eliminarVenta(\''+v.id+'\')">Eliminar</button>':'')+'<button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>');
+  const pagosHtml=v.pagos?.length?v.pagos.map(p=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:0.5px solid #e0dfd8;font-size:13px"><span class="badge '+p.tipo+'">'+p.tipo+'</span><span style="font-weight:500">'+fmt(p.monto)+'</span></div>').join(''):'<span class="badge '+(v.formaPago||'efectivo')+'">'+(v.formaPago||'efectivo')+'</span>';
+  abrirModal('<h3>Venta a '+v.clienteNombre+'</h3>'+anulInfo+'<div class="mf"><span>Fecha</span>'+val(v.fecha)+'</div>'+'<div class="mf"><span>Forma de pago</span>'+pagosHtml+'</div>'+(v.ajuste?'<div class="mf"><span>Ajuste</span>'+v.ajuste+'</div>':'')+'<div class="mf"><span>Productos</span>'+prods+'</div>'+'<div style="background:#1a1a18;border-radius:8px;padding:0.75rem 1rem;margin:0.75rem 0;display:flex;justify-content:space-between;align-items:center"><span style="color:#f1efe8;font-size:14px">Total</span><span style="color:#fff;font-size:18px;font-weight:500">'+fmt(v.total||0)+'</span></div>'+'<div class="mf"><span>Notas</span>'+val(v.notas)+'</div>'+'<div class="mactions">'+(!yaAnulada?'<button class="btn-del" style="background:#faeeda;color:#633806;border-color:#fac775" onclick="anularVenta(\''+v.id+'\')">Anular</button>':'')+(rolActual==='admin'&&!yaAnulada?'<button class="btn-del" onclick="eliminarVenta(\''+v.id+'\')">Eliminar</button>':'')+'<button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>');
 };
 window.eliminarVenta=async function(id){
   if(rolActual!=='admin'){toast('Solo el administrador puede eliminar ventas','err');return;}
@@ -1020,10 +1057,11 @@ window.anularVenta=async function(id){
   try{
     await fsPatch('ventas',id,{estado:'anulada',motivoAnulacion:motivo,fechaAnulacion,anuladaPor});
     ventas=ventas.map(x=>x.id===id?{...x,estado:'anulada',motivoAnulacion:motivo,fechaAnulacion,anuladaPor}:x);
-    if(v.formaPago==='fiado'){
+    const montoFiado=v.pagos?.length?v.pagos.filter(p=>p.tipo==='fiado').reduce((t,p)=>t+p.monto,0):(v.formaPago==='fiado'?v.total||0:0);
+    if(montoFiado>0){
       const cuenta=cuentas.find(c=>c.clienteId===v.clienteId);
       if(cuenta){
-        const movs=[...(cuenta.movimientos||[]),{tipo:'pago',monto:v.total||0,desc:'Reverso por anulación de venta',fecha:fechaAnulacion,id:Date.now()}];
+        const movs=[...(cuenta.movimientos||[]),{tipo:'pago',monto:montoFiado,desc:'Reverso por anulación de venta',fecha:fechaAnulacion,id:Date.now()}];
         await fsPatch('cuentas',cuenta.id,{clienteId:cuenta.clienteId,clienteNombre:cuenta.clienteNombre,movimientos:movs,fechaCreacion:cuenta.fechaCreacion||''});
         cuentas=cuentas.map(c=>c.id===cuenta.id?{...c,movimientos:movs}:c);
       }else{
