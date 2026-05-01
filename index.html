@@ -154,6 +154,7 @@ textarea{height:60px;resize:vertical}
     <button class="nav-mod" id="nav-ventas" onclick="cambiarMod('ventas')">Ventas</button>
     <button class="nav-mod" id="nav-cuentas" onclick="cambiarMod('cuentas')">Cuentas</button>
     <button class="nav-mod" id="nav-gastos" onclick="cambiarMod('gastos')">Gastos</button>
+    <button class="nav-mod" id="nav-caja" onclick="cambiarMod('caja')">Caja</button>
     <button class="nav-mod" id="nav-auditoria" onclick="cambiarMod('auditoria')" style="display:none">Auditoria</button>
     <button class="nav-mod" id="nav-solicitudes" onclick="cambiarMod('solicitudes')" style="display:none">Solicitudes</button>
     <button class="nav-mod" id="nav-stats" onclick="cambiarMod('stats')">Estadisticas</button>
@@ -459,6 +460,19 @@ textarea{height:60px;resize:vertical}
     <div id="lista-auditoria"><div style="text-align:center;padding:2rem;color:#5f5e5a;font-size:14px">Cargando...</div></div>
   </div>
 
+  <!-- CAJA -->
+  <div class="modulo" id="mod-caja">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <div class="tabs" style="margin-bottom:0">
+        <button class="tab active" id="tab-cjt" onclick="showTabCaja('turno')">Turno actual</button>
+        <button class="tab" id="tab-cjh" onclick="showTabCaja('historial')">Historial</button>
+      </div>
+      <span class="contador-badge" id="contador-cj"></span>
+    </div>
+    <div id="sec-cj-turno" class="section active"><div style="text-align:center;padding:2rem;color:#5f5e5a;font-size:14px">Cargando...</div></div>
+    <div id="sec-cj-historial" class="section"></div>
+  </div>
+
 <div class="modal-overlay" id="modal-bg">
   <div class="modal" id="modal-content"></div>
 </div>
@@ -475,7 +489,8 @@ await setPersistence(auth, inMemoryPersistence);
 const authSecundario = getAuth(initializeApp(FB_CONFIG, 'secondary'));
 const BASE = "https://firestore.googleapis.com/v1/projects/cactus-kids-da0b0/databases/(default)/documents";
 
-let clientes=[], cuentas=[], ventas=[], gastos=[], solicitudes=[], auditoria=[];
+let clientes=[], cuentas=[], ventas=[], gastos=[], solicitudes=[], auditoria=[], turnos=[];
+let turnoActivo=null;
 let hijosTemp=[], editHijosTemp=[], prodsTemp=[];
 let filtroCl='todos', filtroCC='todos', filtroSol='todas';
 let _savingCliente=false, _savingVenta=false, _savingGasto=false;
@@ -621,7 +636,8 @@ function toFs(data) {
 
 async function initData() {
   try {
-    [clientes,cuentas,ventas,gastos,solicitudes]=await Promise.all([fsGet('clientes'),fsGet('cuentas'),fsGet('ventas'),fsGet('gastos'),fsGet('solicitudes')]);
+    [clientes,cuentas,ventas,gastos,solicitudes,turnos]=await Promise.all([fsGet('clientes'),fsGet('cuentas'),fsGet('ventas'),fsGet('gastos'),fsGet('solicitudes'),fsGet('turnos')]);
+    turnoActivo=turnos.find(t=>t.estado==='abierto')||null;
     renderClientes(); renderVentas(); renderCuentas(); renderGastos();
     poblarFiltroMes();
   } catch(e) {
@@ -645,7 +661,7 @@ window.renderGastos=()=>renderGastos();
 window.cambiarMod=function(m){
   const modulosAdmin=['auditoria','solicitudes','stats','usuarios'];
   if(modulosAdmin.includes(m)&&rolActual!=='admin'){toast('Acceso restringido a administradores','err');return;}
-  ['clientes','ventas','cuentas','gastos','auditoria','solicitudes','stats','usuarios'].forEach(x=>{document.getElementById('mod-'+x).classList.toggle('active',m===x);const nav=document.getElementById('nav-'+x);if(nav)nav.classList.toggle('active',m===x);});if(m==='gastos')renderResumenGastos();if(m==='auditoria')cargarAuditoria();if(m==='solicitudes')cargarSolicitudes();if(m==='stats')renderStats();if(m==='usuarios')cargarUsuarios();};
+  ['clientes','ventas','cuentas','gastos','caja','auditoria','solicitudes','stats','usuarios'].forEach(x=>{document.getElementById('mod-'+x).classList.toggle('active',m===x);const nav=document.getElementById('nav-'+x);if(nav)nav.classList.toggle('active',m===x);});if(m==='gastos')renderResumenGastos();if(m==='caja')showTabCaja('turno');if(m==='auditoria')cargarAuditoria();if(m==='solicitudes')cargarSolicitudes();if(m==='stats')renderStats();if(m==='usuarios')cargarUsuarios();};
 window.showTabCl=function(t){['cl','cn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-cl-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderClientes();if(t==='nuevo'){_savingCliente=false;const b=document.getElementById('btn-save-cl');if(b){b.disabled=false;b.textContent='Guardar en la nube';}}};
 window.showTabV=function(t){
   ['vl','va','vn'].forEach(s=>{document.getElementById('tab-'+s).classList.toggle('active',(t==='lista'&&s==='vl')||(t==='anuladas'&&s==='va')||(t==='nuevo'&&s==='vn'));});
@@ -1671,6 +1687,192 @@ function renderResumenGastos() {
 
 
 // MOTIVO DE ELIMINACIÓN
+// ==================== CAJA ====================
+function calcCaja(turno){
+  const desde=turno.fechaApertura;
+  const hasta=turno.fechaCierre||new Date().toISOString();
+  const ventasDelTurno=ventas.filter(v=>v.estado!=='anulada'&&v.fechaCreacion>=desde&&v.fechaCreacion<=hasta);
+  const ventasEfvo=ventasDelTurno.reduce((t,v)=>{
+    if(v.pagos?.length)return t+v.pagos.filter(p=>p.tipo==='efectivo').reduce((s,p)=>s+(p.monto||0),0);
+    return v.formaPago==='efectivo'?t+(v.total||0):t;
+  },0);
+  const ventasTransf=ventasDelTurno.reduce((t,v)=>{
+    if(v.pagos?.length)return t+v.pagos.filter(p=>p.tipo==='transferencia').reduce((s,p)=>s+(p.monto||0),0);
+    return v.formaPago==='transferencia'?t+(v.total||0):t;
+  },0);
+  const ventasTarjeta=ventasDelTurno.reduce((t,v)=>{
+    if(v.pagos?.length)return t+v.pagos.filter(p=>p.tipo==='tarjeta').reduce((s,p)=>s+(p.monto||0),0);
+    return v.formaPago==='tarjeta'?t+(v.total||0):t;
+  },0);
+  const fecha=desde.slice(0,10);
+  const gastosEfvo=gastos.filter(g=>g.fecha===fecha).reduce((t,g)=>t+(g.monto||0),0);
+  const manuales=(turno.movsManuales||[]).reduce((t,m)=>t+(m.monto||0),0);
+  const esperado=(turno.aperturaEfvo||0)+ventasEfvo-gastosEfvo-manuales;
+  return{ventasEfvo,ventasTransf,ventasTarjeta,gastosEfvo,manuales,esperado};
+}
+
+window.showTabCaja=function(t){
+  ['t','h'].forEach(s=>{document.getElementById('tab-cj'+s).classList.toggle('active',(t==='turno'&&s==='t')||(t==='historial'&&s==='h'));});
+  document.getElementById('sec-cj-turno').classList.toggle('active',t==='turno');
+  document.getElementById('sec-cj-historial').classList.toggle('active',t==='historial');
+  if(t==='turno')renderTurnoActual();
+  if(t==='historial')renderHistorialCaja();
+};
+
+function renderTurnoActual(){
+  const el=document.getElementById('sec-cj-turno');
+  if(!turnoActivo){
+    el.innerHTML='<div class="card">'
+      +'<div class="sec-title">Abrir turno</div>'
+      +'<div class="fg full"><div><label>Efectivo en caja al abrir ($)</label>'
+      +'<input type="number" id="cj-apertura" placeholder="0" min="0" style="width:100%;font-size:22px;padding:12px;border:0.5px solid #d3d1c7;border-radius:8px;text-align:center"></div></div>'
+      +'<button class="btn-save" style="margin-top:1rem" onclick="abrirTurno()">Abrir turno</button>'
+      +'</div>';
+    document.getElementById('contador-cj').textContent='Sin turno activo';
+    return;
+  }
+  const calc=calcCaja(turnoActivo);
+  const desde=new Date(turnoActivo.fechaApertura).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const movsHtml=(turnoActivo.movsManuales||[]).length
+    ?'<div style="margin-bottom:1rem"><div style="font-size:12px;font-weight:500;color:#5f5e5a;margin-bottom:6px">Retiros y salidas</div>'
+      +(turnoActivo.movsManuales||[]).map(m=>'<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:0.5px solid #e0dfd8"><span>'+esc(m.desc||m.tipo)+'</span><span style="color:#a32d2d;font-weight:500">-'+fmt(m.monto)+'</span></div>').join('')+'</div>'
+    :'';
+  el.innerHTML='<div class="card">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">'
+    +'<div style="font-size:12px;color:#5f5e5a">'+esc(turnoActivo.abiertoPor)+' · '+desde+'</div>'
+    +'<span class="badge aldia">En curso</span></div>'
+    +'<div style="background:#f1efe8;border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem">'
+    +'<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span>Apertura</span><span style="font-weight:500">'+fmt(turnoActivo.aperturaEfvo||0)+'</span></div>'
+    +'<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;color:#0f6e56"><span>+ Ventas efectivo</span><span style="font-weight:500">'+fmt(calc.ventasEfvo)+'</span></div>'
+    +(calc.gastosEfvo?'<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;color:#a32d2d"><span>- Gastos</span><span style="font-weight:500">'+fmt(calc.gastosEfvo)+'</span></div>':'')
+    +(calc.manuales?'<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;color:#a32d2d"><span>- Retiros / salidas</span><span style="font-weight:500">'+fmt(calc.manuales)+'</span></div>':'')
+    +'<div style="border-top:0.5px solid #d3d1c7;margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;align-items:center"><span style="font-weight:500;font-size:15px">Caja esperada</span><span style="font-size:22px;font-weight:500">'+fmt(calc.esperado)+'</span></div>'
+    +'</div>'
+    +((calc.ventasTransf||calc.ventasTarjeta)?'<div style="background:#e6f1fb;border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem">'
+    +'<div style="font-size:11px;color:#5f5e5a;margin-bottom:6px;font-weight:500">Solo informativo — no impactan la caja</div>'
+    +(calc.ventasTransf?'<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span>Transferencias</span><span style="font-weight:500">'+fmt(calc.ventasTransf)+'</span></div>':'')
+    +(calc.ventasTarjeta?'<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span>Tarjeta</span><span style="font-weight:500">'+fmt(calc.ventasTarjeta)+'</span></div>':'')
+    +'</div>':'')
+    +movsHtml
+    +'<div style="display:flex;gap:8px">'
+    +'<button class="btn-edit" style="flex:1" onclick="registrarMovCaja()">+ Retiro / Salida</button>'
+    +'<button style="flex:1;padding:8px;font-size:14px;font-weight:500;background:#1a1a18;color:#fff;border:none;border-radius:8px;cursor:pointer" onclick="cerrarTurno()">Cerrar turno</button>'
+    +'</div></div>';
+  document.getElementById('contador-cj').textContent='Turno abierto · Caja: '+fmt(calc.esperado);
+}
+
+function renderHistorialCaja(){
+  const el=document.getElementById('sec-cj-historial');
+  const cerrados=turnos.filter(t=>t.estado==='cerrado').sort((a,b)=>new Date(b.fechaApertura)-new Date(a.fechaApertura));
+  if(!cerrados.length){el.innerHTML='<div style="text-align:center;padding:2rem;color:#5f5e5a;font-size:14px">No hay turnos cerrados.</div>';return;}
+  el.innerHTML=cerrados.map(t=>{
+    const calc=calcCaja(t);
+    const dif=(t.cierreEfvo||0)-calc.esperado;
+    const difCls=dif===0?'aldia':dif>0?'porVencer':'vencida';
+    const fecha=new Date(t.fechaApertura).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+    return'<div class="card" style="margin-bottom:0.75rem">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+      +'<strong style="font-size:15px">'+fecha+'</strong>'
+      +'<span class="badge '+difCls+'">'+(dif===0?'Exacto':dif>0?'Sobrante '+fmt(dif):'Faltante '+fmt(Math.abs(dif)))+'</span>'
+      +'</div>'
+      +'<div style="font-size:12px;color:#5f5e5a;margin-bottom:10px">'+esc(t.abiertoPor)+' · Cerrado por '+esc(t.cerradoPor||'—')+'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
+      +'<div style="background:#f1efe8;border-radius:8px;padding:8px;text-align:center"><div style="font-size:11px;color:#5f5e5a;margin-bottom:2px">Esperado</div><div style="font-size:15px;font-weight:500">'+fmt(calc.esperado)+'</div></div>'
+      +'<div style="background:#f1efe8;border-radius:8px;padding:8px;text-align:center"><div style="font-size:11px;color:#5f5e5a;margin-bottom:2px">Real</div><div style="font-size:15px;font-weight:500">'+fmt(t.cierreEfvo||0)+'</div></div>'
+      +'<div style="background:'+(dif===0?'#e1f5ee':dif>0?'#faeeda':'#fcebeb')+';border-radius:8px;padding:8px;text-align:center"><div style="font-size:11px;color:#5f5e5a;margin-bottom:2px">Diferencia</div><div style="font-size:15px;font-weight:500;color:'+(dif===0?'#085041':dif>0?'#633806':'#a32d2d')+'">'+(dif===0?'$0':(dif>0?'+':'')+fmt(dif))+'</div></div>'
+      +'</div></div>';
+  }).join('');
+}
+
+window.abrirTurno=async function(){
+  if(turnoActivo){toast('Ya hay un turno abierto','err');return;}
+  const monto=parseFloat(document.getElementById('cj-apertura')?.value)||0;
+  const por=auth.currentUser?.email||'desconocido';
+  try{
+    const doc=await fsAdd('turnos',{aperturaEfvo:monto,estado:'abierto',fechaApertura:new Date().toISOString(),abiertoPor:por,fechaCierre:null,cierreEfvo:null,cerradoPor:null,movsManuales:[]});
+    turnos.unshift(doc);turnoActivo=doc;
+    logAccion('caja','apertura',fmt(monto));
+    renderTurnoActual();toast('Turno abierto','ok');
+  }catch(e){toast('Error al abrir turno','err');}
+};
+
+window.registrarMovCaja=function(){
+  window._cajaMovTipo='retiro';
+  abrirModal('<h3>Registrar retiro / salida</h3>'
+    +'<div style="display:flex;gap:8px;margin-bottom:12px">'
+    +'<button id="cj-tipo-retiro" onclick="selTipoCaja(\'retiro\')" style="flex:1;padding:9px;font-size:13px;font-weight:500;border-radius:8px;border:0.5px solid #85b7eb;background:#e6f1fb;color:#185fa5;cursor:pointer">Retiro del dueño</button>'
+    +'<button id="cj-tipo-salida" onclick="selTipoCaja(\'salida\')" style="flex:1;padding:9px;font-size:13px;font-weight:500;border-radius:8px;border:0.5px solid #d3d1c7;background:#fff;color:#5f5e5a;cursor:pointer">Salida chica</button>'
+    +'</div>'
+    +'<div class="fg full" style="margin-bottom:8px"><div><label>Monto ($)</label><input type="number" id="cj-mov-monto" placeholder="0" min="0" style="width:100%;font-size:14px;padding:8px 10px;border:0.5px solid #d3d1c7;border-radius:8px"></div></div>'
+    +'<div class="fg full" style="margin-bottom:12px"><div><label>Descripción</label><input type="text" id="cj-mov-desc" placeholder="Ej: Retiro para banco, papel, limpieza..." style="width:100%;font-size:14px;padding:8px 10px;border:0.5px solid #d3d1c7;border-radius:8px"></div></div>'
+    +'<div class="mactions"><button class="btn-save" style="flex:2" onclick="guardarMovCaja()">Guardar</button><button class="btn-close" onclick="cerrarModal()">Cancelar</button></div>');
+};
+
+window.selTipoCaja=function(tipo){
+  window._cajaMovTipo=tipo;
+  const bR=document.getElementById('cj-tipo-retiro');const bS=document.getElementById('cj-tipo-salida');
+  if(bR)bR.style.cssText='flex:1;padding:9px;font-size:13px;font-weight:500;border-radius:8px;cursor:pointer;border:0.5px solid '+(tipo==='retiro'?'#85b7eb;background:#e6f1fb;color:#185fa5':'#d3d1c7;background:#fff;color:#5f5e5a');
+  if(bS)bS.style.cssText='flex:1;padding:9px;font-size:13px;font-weight:500;border-radius:8px;cursor:pointer;border:0.5px solid '+(tipo==='salida'?'#f09595;background:#fcebeb;color:#a32d2d':'#d3d1c7;background:#fff;color:#5f5e5a');
+};
+
+window.guardarMovCaja=async function(){
+  if(!turnoActivo)return;
+  const monto=parseFloat(document.getElementById('cj-mov-monto')?.value)||0;
+  const desc=document.getElementById('cj-mov-desc')?.value.trim()||'';
+  const tipo=window._cajaMovTipo||'retiro';
+  if(!monto){toast('Ingresá un monto','err');return;}
+  const mov={id:Date.now(),tipo,monto,desc:desc||(tipo==='retiro'?'Retiro del dueño':'Salida chica'),fecha:new Date().toISOString(),por:auth.currentUser?.email||'desconocido'};
+  const movs=[...(turnoActivo.movsManuales||[]),mov];
+  try{
+    await fsPatch('turnos',turnoActivo.id,{movsManuales:movs});
+    turnoActivo.movsManuales=movs;
+    turnos=turnos.map(t=>t.id===turnoActivo.id?{...t,movsManuales:movs}:t);
+    logAccion('caja',tipo,fmt(monto)+(desc?' · '+desc:''));
+    cerrarModal();renderTurnoActual();toast('Movimiento registrado','ok');
+  }catch(e){toast('Error al guardar','err');}
+};
+
+window.cerrarTurno=function(){
+  if(!turnoActivo)return;
+  const calc=calcCaja(turnoActivo);
+  abrirModal('<h3>Cerrar turno</h3>'
+    +'<div style="background:#f1efe8;border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem">'
+    +'<div style="font-size:12px;color:#5f5e5a;margin-bottom:2px">Caja esperada</div>'
+    +'<div style="font-size:26px;font-weight:500">'+fmt(calc.esperado)+'</div>'
+    +'</div>'
+    +'<div class="fg full" style="margin-bottom:12px"><div><label>Efectivo real contado ($)</label>'
+    +'<input type="number" id="cj-cierre" placeholder="0" min="0" style="width:100%;font-size:22px;padding:12px;border:0.5px solid #d3d1c7;border-radius:8px;text-align:center" oninput="previewDiferencia('+calc.esperado+')">'
+    +'<div id="cj-dif-preview" style="font-size:14px;margin-top:6px;padding:8px 12px;border-radius:6px;display:none"></div>'
+    +'</div></div>'
+    +'<div class="mactions"><button style="flex:2;padding:10px;font-size:14px;font-weight:500;background:#1a1a18;color:#fff;border:none;border-radius:8px;cursor:pointer" onclick="confirmarCierre('+calc.esperado+')">Confirmar cierre</button><button class="btn-close" onclick="cerrarModal()">Cancelar</button></div>');
+};
+
+window.previewDiferencia=function(esperado){
+  const real=parseFloat(document.getElementById('cj-cierre')?.value)||0;
+  const dif=real-esperado;
+  const el=document.getElementById('cj-dif-preview');if(!el)return;
+  el.style.display='block';
+  if(dif===0){el.style.background='#e1f5ee';el.style.color='#085041';el.textContent='Caja exacta ✓';}
+  else if(dif>0){el.style.background='#faeeda';el.style.color='#633806';el.textContent='Sobrante: '+fmt(dif);}
+  else{el.style.background='#fcebeb';el.style.color='#a32d2d';el.textContent='Faltante: '+fmt(Math.abs(dif));}
+};
+
+window.confirmarCierre=async function(esperado){
+  const real=parseFloat(document.getElementById('cj-cierre')?.value)||0;
+  const por=auth.currentUser?.email||'desconocido';
+  const fecha=new Date().toISOString();
+  const dif=real-esperado;
+  try{
+    await fsPatch('turnos',turnoActivo.id,{estado:'cerrado',cierreEfvo:real,cerradoPor:por,fechaCierre:fecha});
+    const cerrado={...turnoActivo,estado:'cerrado',cierreEfvo:real,cerradoPor:por,fechaCierre:fecha};
+    turnos=turnos.map(t=>t.id===turnoActivo.id?cerrado:t);
+    logAccion('caja','cierre','Esperado: '+fmt(esperado)+' · Real: '+fmt(real)+(dif!==0?' · '+(dif>0?'Sobrante':'Faltante')+': '+fmt(Math.abs(dif)):''));
+    turnoActivo=null;
+    cerrarModal();renderTurnoActual();renderHistorialCaja();
+    toast('Turno cerrado','ok');
+  }catch(e){toast('Error al cerrar turno','err');}
+};
+
 function pedirMotivoAnulacion(mensaje) {
   return new Promise(resolve => {
     const overlay = document.createElement('div');
