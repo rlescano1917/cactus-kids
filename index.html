@@ -630,7 +630,8 @@ async function initData() {
 }
 
 function fmt(n){return '$'+Math.round(n).toLocaleString('es-AR');}
-function val(v){return v&&String(v).trim()?v:'—';}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function val(v){return v&&String(v).trim()?esc(v):'—';}
 function limpiarTel(t){return(t||'').replace(/[^0-9]/g,'');}
 
 // Exponer funciones de render al scope global para los oninput del HTML
@@ -703,7 +704,9 @@ window.guardarCliente=async function(){
   const dni=document.getElementById('f-dni').value.trim();
   const tel=limpiarTel(document.getElementById('f-tel').value);
   if(!nombre||!apellido){toast('Completa nombre y apellido','err');return;}
+  if(nombre.length>60||apellido.length>60){toast('Nombre o apellido demasiado largo','err');return;}
   if(!dni){toast('El DNI es obligatorio','err');return;}
+  if(!/^\d{7,8}$/.test(dni)){toast('El DNI debe tener 7 u 8 dígitos numéricos','err');return;}
   if(!tel||tel.length<8){toast('El WhatsApp es obligatorio','err');return;}
   if(clientes.find(c=>c.dni===dni)){toast('Ya existe un cliente con ese DNI','err');return;}
   _savingCliente=true;
@@ -743,26 +746,26 @@ function renderClientes(){
     const tp=cr?'<span class="badge critico">Sin credito</span>':c.tipo==='vip'?'<span class="badge vip">VIP</span>':'';
     const pts=(c.puntos||0);
     const ptsBadge=pts>0?'<span class="badge" style="background:#faeeda;color:#633806;border-color:#fac775">'+pts+' pts</span>':'';
-    return '<div class="row'+(cr?' danger':'')+'" onclick="verCliente(\''+c.id+'\')"><div class="avatar'+(cr?' danger':'')+'">'+ini.toUpperCase()+'</div><div class="info"><strong>'+c.nombre+' '+c.apellido+'</strong><span>DNI '+(c.dni||'—')+' · '+(c.tel||'Sin tel')+(c.ciudad?' · '+c.ciudad:'')+'</span></div><div style="display:flex;gap:4px;flex-shrink:0">'+hj+tp+ptsBadge+'</div></div>';
+    return '<div class="row'+(cr?' danger':'')+'" onclick="verCliente(\''+c.id+'\')"><div class="avatar'+(cr?' danger':'')+'">'+ini.toUpperCase()+'</div><div class="info"><strong>'+esc(c.nombre)+' '+esc(c.apellido)+'</strong><span>DNI '+(c.dni?esc(c.dni):'—')+' · '+(c.tel?esc(c.tel):'Sin tel')+(c.ciudad?' · '+esc(c.ciudad):'')+'</span></div><div style="display:flex;gap:4px;flex-shrink:0">'+hj+tp+ptsBadge+'</div></div>';
   }).join('');
 }
 
 window.verCliente=function(id){
   const c=clientes.find(x=>x.id===id);if(!c)return;
   const cr=c.tipo==='critico';
-  const hj=c.hijos?.length?c.hijos.map(h=>'<div style="background:#f1efe8;border-radius:8px;padding:8px;margin-bottom:6px;font-size:13px"><strong>'+(h.nombre||'Sin nombre')+'</strong><br>'+(h.fechaNac?'Nac: '+h.fechaNac+' · ':'')+(h.talle?'Talle: '+h.talle:'')+(h.genero?' · '+h.genero:'')+'</div>').join(''):'<span style="font-size:13px;color:#5f5e5a">Sin hijos</span>';
+  const hj=c.hijos?.length?c.hijos.map(h=>'<div style="background:#f1efe8;border-radius:8px;padding:8px;margin-bottom:6px;font-size:13px"><strong>'+esc(h.nombre||'Sin nombre')+'</strong><br>'+(h.fechaNac?'Nac: '+esc(h.fechaNac)+' · ':'')+(h.talle?'Talle: '+esc(h.talle):'')+(h.genero?' · '+esc(h.genero):'')+'</div>').join(''):'<span style="font-size:13px;color:#5f5e5a">Sin hijos</span>';
   const waUrl='https://wa.me/549'+c.tel+'?text='+encodeURIComponent('Hola '+c.nombre+'! Te registramos como cliente de Cactus Kids.');
   const wa2Url=c.tel2?'https://wa.me/549'+c.tel2+'?text='+encodeURIComponent('Hola '+c.nombre+'! Te registramos como cliente de Cactus Kids.'):'';
   const alerta=cr?'<div style="background:#fcebeb;border-radius:8px;padding:10px 14px;margin-bottom:1rem"><strong style="color:#791f1f;display:block">No otorgar credito ni fiado</strong><span style="font-size:13px;color:#a32d2d">Cliente critico.</span></div>':'';
-  abrirModal(alerta+'<h3>'+c.nombre+' '+c.apellido+'</h3>'
+  abrirModal(alerta+'<h3>'+esc(c.nombre)+' '+esc(c.apellido)+'</h3>'
     +'<div class="mf"><span>DNI</span>'+val(c.dni)+'</div>'
     +'<div class="mf"><span>Fecha de nac.</span>'+val(c.fnac)+'</div>'
-    +'<div class="mf"><span>WhatsApp principal</span><div style="display:flex;align-items:center">'+(c.tel||'—')+(c.tel?'<a href="'+waUrl+'" target="_blank" class="wa-btn">Enviar WA</a>':'')+'</div></div>'
-    +(c.tel2?'<div class="mf"><span>WA secundario'+(c.tel2Desc?' ('+c.tel2Desc+')':'')+'</span><div style="display:flex;align-items:center">'+c.tel2+'<a href="'+wa2Url+'" target="_blank" class="wa-btn">Enviar WA</a></div></div>':'')
+    +'<div class="mf"><span>WhatsApp principal</span><div style="display:flex;align-items:center">'+(c.tel?esc(c.tel):'—')+(c.tel?'<a href="'+waUrl+'" target="_blank" class="wa-btn">Enviar WA</a>':'')+'</div></div>'
+    +(c.tel2?'<div class="mf"><span>WA secundario'+(c.tel2Desc?' ('+esc(c.tel2Desc)+')':'')+'</span><div style="display:flex;align-items:center">'+esc(c.tel2)+'<a href="'+wa2Url+'" target="_blank" class="wa-btn">Enviar WA</a></div></div>':'')
     +'<div class="mf"><span>Email</span>'+val(c.email)+'</div>'
     +'<div class="mf"><span>Ciudad</span>'+val(c.ciudad)+'</div>'
     +'<div class="mf"><span>Como llego</span>'+val(c.origen)+'</div>'
-    +'<div class="mf"><span>Tipo</span>'+(c.tipo||'regular')+'</div>'
+    +'<div class="mf"><span>Tipo</span>'+esc(c.tipo||'regular')+'</div>'
     +'<div class="mf"><span>Alta</span>'+(c.fechaAlta?new Date(c.fechaAlta).toLocaleDateString('es-AR'):'—')+'</div>'
     +'<div class="mf"><span>Hijos</span>'+hj+'</div>'
     +'<div class="mf"><span>Notas</span>'+val(c.notas)+'</div>'
@@ -783,11 +786,11 @@ window.editarCliente=function(id){
   const tipoOpts=[['regular','Regular'],['vip','VIP'],['nuevo','Nuevo'],['inactivo','Inactivo'],['critico','Sin credito (critico)']].map(([v,l])=>'<option value="'+v+'"'+(c.tipo===v?' selected':'')+'>'+l+'</option>').join('');
   const origenOpts=['Redes sociales','Recomendacion','Paso por el local','WhatsApp','Otro'].map(o=>'<option'+(c.origen===o?' selected':'')+'>'+o+'</option>').join('');
   abrirModal('<h3>Editar cliente</h3>'
-    +'<div class="fg"><div><label>Nombre completo *</label><input id="e-nombre" type="text" value="'+(c.nombre||'')+'" style="width:100%"></div><div><label>Apellido completo *</label><input id="e-apellido" type="text" value="'+(c.apellido||'')+'" style="width:100%"></div></div>'
-    +'<div class="fg"><div><label>DNI</label><input id="e-dni" type="text" value="'+(c.dni||'')+'" maxlength="8" style="width:100%"></div><div><label>Fecha de nac.</label><input id="e-fnac" type="date" value="'+(c.fnac||'')+'" style="width:100%"></div></div>'
-    +'<div class="fg full"><div><label>WhatsApp principal *</label><input id="e-tel" type="tel" value="'+(c.tel||'')+'" style="width:100%"></div></div>'
-    +'<div class="fg"><div><label>WA secundario</label><input id="e-tel2" type="tel" value="'+(c.tel2||'')+'" style="width:100%"></div><div><label>Descripcion</label><input id="e-tel2desc" type="text" value="'+(c.tel2Desc||'')+'" placeholder="marido, mama..." style="width:100%"></div></div>'
-    +'<div class="fg"><div><label>Email</label><input id="e-email" type="email" value="'+(c.email||'')+'" style="width:100%"></div><div><label>Ciudad</label><input id="e-ciudad" type="text" value="'+(c.ciudad||'')+'" style="width:100%"></div></div>'
+    +'<div class="fg"><div><label>Nombre completo *</label><input id="e-nombre" type="text" value="'+esc(c.nombre||'')+'" style="width:100%"></div><div><label>Apellido completo *</label><input id="e-apellido" type="text" value="'+esc(c.apellido||'')+'" style="width:100%"></div></div>'
+    +'<div class="fg"><div><label>DNI</label><input id="e-dni" type="text" value="'+esc(c.dni||'')+'" maxlength="8" style="width:100%"></div><div><label>Fecha de nac.</label><input id="e-fnac" type="date" value="'+esc(c.fnac||'')+'" style="width:100%"></div></div>'
+    +'<div class="fg full"><div><label>WhatsApp principal *</label><input id="e-tel" type="tel" value="'+esc(c.tel||'')+'" style="width:100%"></div></div>'
+    +'<div class="fg"><div><label>WA secundario</label><input id="e-tel2" type="tel" value="'+esc(c.tel2||'')+'" style="width:100%"></div><div><label>Descripcion</label><input id="e-tel2desc" type="text" value="'+esc(c.tel2Desc||'')+'" placeholder="marido, mama..." style="width:100%"></div></div>'
+    +'<div class="fg"><div><label>Email</label><input id="e-email" type="email" value="'+esc(c.email||'')+'" style="width:100%"></div><div><label>Ciudad</label><input id="e-ciudad" type="text" value="'+esc(c.ciudad||'')+'" style="width:100%"></div></div>'
     +'<div class="fg"><div><label>Como nos conocio</label><select id="e-origen" style="width:100%"><option value="">Seleccionar...</option>'+origenOpts+'</select></div><div><label>Tipo</label><select id="e-tipo" style="width:100%">'+tipoOpts+'</select></div></div>'
     +'<div style="font-size:13px;font-weight:500;color:#5f5e5a;margin:0.75rem 0 0.4rem;border-bottom:0.5px solid #e0dfd8;padding-bottom:4px">Hijos</div>'
     +'<div id="edit-hijos-container"></div>'
@@ -1029,16 +1032,16 @@ function renderVentas(){
   const f=activas.filter(v=>(v.clienteNombre+' '+(v.formaPago||'')).toLowerCase().includes(q));
   f.sort((a,b)=>new Date(b.fechaCreacion)-new Date(a.fechaCreacion));
   if(!f.length){el.innerHTML='<div style="text-align:center;padding:2rem;color:#5f5e5a;font-size:14px">No hay ventas.</div>';return;}
-  el.innerHTML=f.map(v=>{const ini=(v.clienteNombre||'??').split(' ').map(p=>p[0]||'').slice(0,2).join('').toUpperCase();const nP=v.productos?.length||0;const fp=v.formaPago||'efectivo';const badgeCls=fp==='mixto'?'':fp;const badgeTxt=fp==='mixto'?'Mixto':fp;return'<div class="row" onclick="verVenta(\''+v.id+'\')"><div class="avatar">'+ini+'</div><div class="info"><strong>'+v.clienteNombre+'</strong><span>'+v.fecha+' · '+nP+' producto'+(nP!==1?'s':'')+'</span></div><div style="display:flex;gap:6px;align-items:center;flex-shrink:0"><span class="badge '+badgeCls+'">'+badgeTxt+'</span><span style="font-size:15px;font-weight:500">'+fmt(v.total||0)+'</span></div></div>';}).join('');
+  el.innerHTML=f.map(v=>{const ini=(v.clienteNombre||'??').split(' ').map(p=>p[0]||'').slice(0,2).join('').toUpperCase();const nP=v.productos?.length||0;const fp=v.formaPago||'efectivo';const badgeCls=fp==='mixto'?'':fp;const badgeTxt=fp==='mixto'?'Mixto':fp;return'<div class="row" onclick="verVenta(\''+v.id+'\')"><div class="avatar">'+ini+'</div><div class="info"><strong>'+esc(v.clienteNombre)+'</strong><span>'+esc(v.fecha)+' · '+nP+' producto'+(nP!==1?'s':'')+'</span></div><div style="display:flex;gap:6px;align-items:center;flex-shrink:0"><span class="badge '+badgeCls+'">'+badgeTxt+'</span><span style="font-size:15px;font-weight:500">'+fmt(v.total||0)+'</span></div></div>';}).join('');
 }
 
 window.verVenta=function(id){
   const v=ventas.find(x=>x.id===id);if(!v)return;
-  const prods=v.productos?.length?v.productos.map(p=>'<div style="background:#f1efe8;border-radius:8px;padding:8px;margin-bottom:6px;font-size:13px;display:flex;justify-content:space-between"><span>'+(p.desc||'—')+(p.talle?' · '+p.talle:'')+' x'+(p.cantidad||1)+'</span><span style="font-weight:500">'+fmt((p.precio||0)*(p.cantidad||1))+'</span></div>').join(''):'<span style="font-size:13px;color:#5f5e5a">Sin detalle</span>';
+  const prods=v.productos?.length?v.productos.map(p=>'<div style="background:#f1efe8;border-radius:8px;padding:8px;margin-bottom:6px;font-size:13px;display:flex;justify-content:space-between"><span>'+esc(p.desc||'—')+(p.talle?' · '+esc(p.talle):'')+' x'+(p.cantidad||1)+'</span><span style="font-weight:500">'+fmt((p.precio||0)*(p.cantidad||1))+'</span></div>').join(''):'<span style="font-size:13px;color:#5f5e5a">Sin detalle</span>';
   const yaAnulada=v.estado==='anulada';
   const anulInfo=yaAnulada?'<div style="background:#fcebeb;border:0.5px solid #f09595;border-radius:8px;padding:10px 14px;margin-bottom:12px"><strong style="font-size:13px;color:#791f1f">Venta anulada</strong><div style="font-size:12px;color:#a32d2d;margin-top:2px">'+val(v.fechaAnulacion)+' · Por '+(v.anuladaPor||'—')+'</div><div style="font-size:12px;color:#a32d2d;margin-top:2px">Motivo: '+(v.motivoAnulacion||'—')+'</div></div>':'';
   const pagosHtml=v.pagos?.length?v.pagos.map(p=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:0.5px solid #e0dfd8;font-size:13px"><span class="badge '+p.tipo+'">'+p.tipo+'</span><span style="font-weight:500">'+fmt(p.monto)+'</span></div>').join(''):'<span class="badge '+(v.formaPago||'efectivo')+'">'+(v.formaPago||'efectivo')+'</span>';
-  abrirModal('<h3>Venta a '+v.clienteNombre+'</h3>'+anulInfo+'<div class="mf"><span>Fecha</span>'+val(v.fecha)+'</div>'+'<div class="mf"><span>Forma de pago</span>'+pagosHtml+'</div>'+(v.ajuste?'<div class="mf"><span>Ajuste</span>'+v.ajuste+'</div>':'')+'<div class="mf"><span>Productos</span>'+prods+'</div>'+'<div style="background:#1a1a18;border-radius:8px;padding:0.75rem 1rem;margin:0.75rem 0;display:flex;justify-content:space-between;align-items:center"><span style="color:#f1efe8;font-size:14px">Total</span><span style="color:#fff;font-size:18px;font-weight:500">'+fmt(v.total||0)+'</span></div>'+'<div class="mf"><span>Notas</span>'+val(v.notas)+'</div>'+'<div class="mactions">'+(!yaAnulada?'<button class="btn-del" style="background:#faeeda;color:#633806;border-color:#fac775" onclick="anularVenta(\''+v.id+'\')">Anular</button>':'')+(rolActual==='admin'&&!yaAnulada?'<button class="btn-del" onclick="eliminarVenta(\''+v.id+'\')">Eliminar</button>':'')+'<button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>');
+  abrirModal('<h3>Venta a '+esc(v.clienteNombre)+'</h3>'+anulInfo+'<div class="mf"><span>Fecha</span>'+val(v.fecha)+'</div>'+'<div class="mf"><span>Forma de pago</span>'+pagosHtml+'</div>'+(v.ajuste?'<div class="mf"><span>Ajuste</span>'+v.ajuste+'</div>':'')+'<div class="mf"><span>Productos</span>'+prods+'</div>'+'<div style="background:#1a1a18;border-radius:8px;padding:0.75rem 1rem;margin:0.75rem 0;display:flex;justify-content:space-between;align-items:center"><span style="color:#f1efe8;font-size:14px">Total</span><span style="color:#fff;font-size:18px;font-weight:500">'+fmt(v.total||0)+'</span></div>'+'<div class="mf"><span>Notas</span>'+val(v.notas)+'</div>'+'<div class="mactions">'+(!yaAnulada?'<button class="btn-del" style="background:#faeeda;color:#633806;border-color:#fac775" onclick="anularVenta(\''+v.id+'\')">Anular</button>':'')+(rolActual==='admin'&&!yaAnulada?'<button class="btn-del" onclick="eliminarVenta(\''+v.id+'\')">Eliminar</button>':'')+'<button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>');
 };
 window.eliminarVenta=async function(id){
   if(rolActual!=='admin'){toast('Solo el administrador puede eliminar ventas','err');return;}
@@ -1083,9 +1086,9 @@ function renderAnuladas(){
     const ini=(v.clienteNombre||'??').split(' ').map(p=>p[0]||'').slice(0,2).join('').toUpperCase();
     return'<div class="row" style="opacity:0.85" onclick="verVenta(\''+v.id+'\')">'
       +'<div class="avatar danger">'+ini+'</div>'
-      +'<div class="info"><strong>'+v.clienteNombre+'</strong>'
-      +'<span>'+val(v.fechaAnulacion)+' · Por '+(v.anuladaPor||'—')+'</span>'
-      +'<span style="color:#a32d2d;font-size:12px">'+(v.motivoAnulacion||'—')+'</span></div>'
+      +'<div class="info"><strong>'+esc(v.clienteNombre)+'</strong>'
+      +'<span>'+val(v.fechaAnulacion)+' · Por '+esc(v.anuladaPor||'—')+'</span>'
+      +'<span style="color:#a32d2d;font-size:12px">'+esc(v.motivoAnulacion||'—')+'</span></div>'
       +'<div style="display:flex;gap:6px;align-items:center;flex-shrink:0">'
       +'<span class="badge critico">Anulada</span>'
       +'<span style="font-size:14px;font-weight:500;text-decoration:line-through;color:#5f5e5a">'+fmt(v.total||0)+'</span>'
@@ -1136,7 +1139,7 @@ function renderCuentas(){
     else if(est==='vencida')badge='<span class="badge vencida">Vencida hace '+diasVencida(c)+'d</span>';
     else if(est==='porVencer')badge='<span class="badge porVencer">Vence en '+diasParaVencer(c)+'d</span>';
     else badge='<span class="badge aldia">Al dia</span>';
-    return'<div class="row'+rcls+'" onclick="verCuenta(\''+c.id+'\')"><div class="avatar'+avcls+'">'+ini+'</div><div class="info"><strong>'+c.clienteNombre+'</strong><span>'+(c.movimientos||[]).length+' movimiento'+((c.movimientos||[]).length!==1?'s':'')+'</span></div><div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'+(s>0?'<span style="font-size:14px;font-weight:500">'+fmt(s)+'</span>':'')+badge+'</div></div>';
+    return'<div class="row'+rcls+'" onclick="verCuenta(\''+c.id+'\')"><div class="avatar'+avcls+'">'+ini+'</div><div class="info"><strong>'+esc(c.clienteNombre)+'</strong><span>'+(c.movimientos||[]).length+' movimiento'+((c.movimientos||[]).length!==1?'s':'')+'</span></div><div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'+(s>0?'<span style="font-size:14px;font-weight:500">'+fmt(s)+'</span>':'')+badge+'</div></div>';
   }).join('');
 }
 
@@ -1175,12 +1178,12 @@ window.verCuenta=function(id){
       else if(diff<=7)vb='<span class="vbadge porVencer">Vence en '+diff+'d</span>';
       else vb='<span class="vbadge aldia">Vence '+m.vencimiento+'</span>';
     }
-    return'<div class="mov-row"><div class="mov-top"><span class="mov-tipo '+m.tipo+'">'+(m.tipo==='cargo'?'Cargo':'Pago')+'</span><span class="mov-desc">'+(m.desc||'—')+'</span><span class="mov-monto '+m.tipo+'">'+(m.tipo==='cargo'?'+':'-')+fmt(m.monto)+'</span>'+(rolActual==='admin'?'<button class="mov-del" onclick="eliminarMov(\''+id+'\','+m.id+')">x</button>':'')+'</div><div class="mov-bot">'+m.fecha+(vb?' '+vb:'')+'</div></div>';
+    return'<div class="mov-row"><div class="mov-top"><span class="mov-tipo '+m.tipo+'">'+(m.tipo==='cargo'?'Cargo':'Pago')+'</span><span class="mov-desc">'+esc(m.desc||'—')+'</span><span class="mov-monto '+m.tipo+'">'+(m.tipo==='cargo'?'+':'-')+fmt(m.monto)+'</span>'+(rolActual==='admin'?'<button class="mov-del" onclick="eliminarMov(\''+id+'\','+m.id+')">x</button>':'')+'</div><div class="mov-bot">'+m.fecha+(vb?' '+vb:'')+'</div></div>';
   }).join(''):'<div style="font-size:13px;color:#5f5e5a;padding:0.5rem 0">Sin movimientos.</div>';
 
   const est=estadoCuenta(c);
   const modalEl=document.getElementById('modal-content');
-  modalEl.innerHTML='<h3>'+c.clienteNombre+'</h3>'
+  modalEl.innerHTML='<h3>'+esc(c.clienteNombre)+'</h3>'
     +'<span class="badge '+est+'" style="margin-bottom:1rem;display:inline-block">'+{saldado:'Saldado',aldia:'Al dia',porVencer:'Por vencer',vencida:'VENCIDA'}[est]+'</span>'
     +'<div class="saldo-box"><div class="lbl">Saldo actual</div><div class="monto '+(s>0?'debe':'ok')+'">'+(s>0?'Debe '+fmt(s):'Saldado')+'</div></div>'
     +'<div style="display:flex;gap:8px;margin-bottom:1rem"><button style="flex:1;padding:8px;font-size:13px;font-weight:500;background:#fcebeb;color:#a32d2d;border:0.5px solid #f09595;border-radius:8px;cursor:pointer" onclick="agregarMov(\''+id+'\',\'cargo\')">+ Cargo</button><button style="flex:1;padding:8px;font-size:13px;font-weight:500;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5;border-radius:8px;cursor:pointer" onclick="mostrarDistribucion(\''+id+'\')">+ Pago</button></div>'
@@ -1586,7 +1589,7 @@ function renderGastos() {
   };
   el.innerHTML = f.map(g => {
     const cl = colores[g.tipo] || colores['variable'];
-    return '<div class="row" onclick="verGasto(this.dataset.id)" data-id="'+g.id+'"><div class="avatar" style="background:'+cl.bg+';color:'+cl.color+';font-size:11px;font-weight:500">'+( g.categoria||'Otro').substring(0,4).toUpperCase()+'</div><div class="info"><strong>'+(g.desc||g.categoria)+'</strong><span>'+g.fecha+' · '+g.categoria+'</span></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><span style="font-size:15px;font-weight:500;color:#a32d2d">-'+fmt(g.monto)+'</span><span style="font-size:11px;padding:2px 8px;border-radius:6px;background:'+cl.bg+';color:'+cl.color+';border:0.5px solid '+cl.border+'">'+g.tipo+'</span></div></div>';
+    return '<div class="row" onclick="verGasto(this.dataset.id)" data-id="'+g.id+'"><div class="avatar" style="background:'+cl.bg+';color:'+cl.color+';font-size:11px;font-weight:500">'+esc(g.categoria||'Otro').substring(0,4).toUpperCase()+'</div><div class="info"><strong>'+esc(g.desc||g.categoria)+'</strong><span>'+esc(g.fecha)+' · '+esc(g.categoria)+'</span></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><span style="font-size:15px;font-weight:500;color:#a32d2d">-'+fmt(g.monto)+'</span><span style="font-size:11px;padding:2px 8px;border-radius:6px;background:'+cl.bg+';color:'+cl.color+';border:0.5px solid '+cl.border+'">'+g.tipo+'</span></div></div>';
   }).join('');
 }
 
@@ -2107,7 +2110,7 @@ window.renderAuditoria = function() {
   el.innerHTML = f.map(a => {
     const fecha = a.fecha ? new Date(a.fecha).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
     const bg = moduloBg[a.modulo] || '#f1efe8';
-    return '<div class="row" style="cursor:default"><div class="avatar" style="background:'+bg+';color:#1a1a18;font-size:11px;font-weight:500">'+(a.modulo||'').substring(0,4).toUpperCase()+'</div><div class="info"><strong>'+val(a.accion)+' · '+val(a.detalle)+'</strong><span>'+(a.usuario||'—')+' · '+fecha+'</span></div></div>';
+    return '<div class="row" style="cursor:default"><div class="avatar" style="background:'+bg+';color:#1a1a18;font-size:11px;font-weight:500">'+esc(a.modulo||'').substring(0,4).toUpperCase()+'</div><div class="info"><strong>'+val(a.accion)+' · '+val(a.detalle)+'</strong><span>'+esc(a.usuario||'—')+' · '+fecha+'</span></div></div>';
   }).join('');
 };
 
