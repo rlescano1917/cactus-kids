@@ -257,19 +257,23 @@ textarea{height:60px;resize:vertical}
         <div class="sec-title">Productos</div>
         <div id="prods-container"></div>
         <button class="btn-add" onclick="agregarProd()" style="margin-bottom:8px">+ Agregar producto</button>
-        <div class="sec-title">Descuento / Recargo (opcional)</div>
-        <div class="fg trio">
-          <div><label>Tipo</label>
-            <select id="aj-tipo" onchange="calcTotal()">
-              <option value="ninguno">Ninguno</option>
-              <option value="desc-pct">Descuento %</option>
-              <option value="desc-fijo">Descuento $</option>
-              <option value="rec-pct">Recargo %</option>
-              <option value="rec-fijo">Recargo $</option>
-            </select>
+        <button type="button" id="btn-aj-toggle" onclick="toggleAjuste()" style="width:100%;text-align:left;background:none;border:none;border-top:0.5px solid #e0dfd8;padding:10px 0 6px;font-size:13px;font-weight:500;color:#5f5e5a;cursor:pointer;display:flex;align-items:center;gap:6px">
+          <span id="btn-aj-icon" style="font-size:10px">▶</span> Descuento / Recargo (opcional)
+        </button>
+        <div id="sec-ajuste" style="display:none">
+          <div class="fg trio">
+            <div><label>Tipo</label>
+              <select id="aj-tipo" onchange="calcTotal()">
+                <option value="ninguno">Ninguno</option>
+                <option value="desc-pct">Descuento %</option>
+                <option value="desc-fijo">Descuento $</option>
+                <option value="rec-pct">Recargo %</option>
+                <option value="rec-fijo">Recargo $</option>
+              </select>
+            </div>
+            <div><label>Valor</label><input type="number" id="aj-valor" placeholder="0" min="0" oninput="calcTotal()"></div>
+            <div style="display:flex;align-items:flex-end"><div id="aj-label" style="font-size:12px;color:#5f5e5a;padding-bottom:10px"></div></div>
           </div>
-          <div><label>Valor</label><input type="number" id="aj-valor" placeholder="0" min="0" oninput="calcTotal()"></div>
-          <div style="display:flex;align-items:flex-end"><div id="aj-label" style="font-size:12px;color:#5f5e5a;padding-bottom:10px"></div></div>
         </div>
         <div class="total-box">
           <div><div id="subtotal-label" style="font-size:11px;color:#888;margin-bottom:2px"></div><span>Total</span></div>
@@ -668,7 +672,7 @@ window.showTabV=function(t){
   ['lista','anuladas','nuevo'].forEach(s=>{document.getElementById('sec-v-'+s).classList.toggle('active',s===t);});
   if(t==='lista')renderVentas();
   if(t==='anuladas')renderAnuladas();
-  if(t==='nuevo'){document.getElementById('v-fecha').value=new Date().toISOString().slice(0,10);_savingVenta=false;pagosTemp=[];prodsTemp=[];document.getElementById('pagos-container').innerHTML='';document.getElementById('pagos-restante').style.display='none';document.getElementById('prods-container').innerHTML='';document.getElementById('total-venta').textContent='$0';document.getElementById('aj-tipo').selectedIndex=0;document.getElementById('aj-valor').value='';document.getElementById('aj-label').textContent='';document.getElementById('subtotal-label').textContent='';window._tv=0;const b=document.getElementById('btn-save-v');if(b){b.disabled=false;b.textContent='Registrar venta';}}
+  if(t==='nuevo'){document.getElementById('v-fecha').value=new Date().toISOString().slice(0,10);_savingVenta=false;pagosTemp=[];prodsTemp=[];document.getElementById('pagos-container').innerHTML='';document.getElementById('pagos-restante').style.display='none';document.getElementById('prods-container').innerHTML='';document.getElementById('total-venta').textContent='$0';document.getElementById('aj-tipo').selectedIndex=0;document.getElementById('aj-valor').value='';document.getElementById('aj-label').textContent='';document.getElementById('subtotal-label').textContent='';window._tv=0;cerrarAjuste();const b=document.getElementById('btn-save-v');if(b){b.disabled=false;b.textContent='Registrar venta';}}
 };
 window.showTabCC=function(t){['ccl','ccn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-cc-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderCuentas();};
 
@@ -923,6 +927,18 @@ window.agregarPago=function(){
   actualizarRestante();
 };
 
+window.toggleAjuste=function(){
+  const sec=document.getElementById('sec-ajuste');
+  const icon=document.getElementById('btn-aj-icon');
+  const open=sec.style.display==='none';
+  sec.style.display=open?'block':'none';
+  icon.textContent=open?'▼':'▶';
+};
+function cerrarAjuste(){
+  const sec=document.getElementById('sec-ajuste');const icon=document.getElementById('btn-aj-icon');
+  if(sec)sec.style.display='none';if(icon)icon.textContent='▶';
+}
+
 window.quitarPago=function(id){
   pagosTemp=pagosTemp.filter(p=>p.id!==id);
   document.getElementById('pago-'+id).remove();
@@ -1036,7 +1052,7 @@ window.guardarVenta=async function(){
     document.getElementById('prods-container').innerHTML='';document.getElementById('total-venta').textContent='$0';
     document.getElementById('pagos-container').innerHTML='';document.getElementById('pagos-restante').style.display='none';
     document.getElementById('v-notas').value='';
-    document.getElementById('aj-tipo').selectedIndex=0;document.getElementById('aj-valor').value='';
+    document.getElementById('aj-tipo').selectedIndex=0;document.getElementById('aj-valor').value='';cerrarAjuste();
     if(!document.getElementById('toast').textContent.includes('pts'))toast('Venta registrada!','ok');
     showTabV('lista');
   }catch(e){_savingVenta=false;btn.disabled=false;btn.textContent='Registrar venta';toast('Error al registrar venta','err');}
