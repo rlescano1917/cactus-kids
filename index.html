@@ -910,6 +910,9 @@ window.agregarPago=function(){
     +'<button id="pmodu-'+id+'" onclick="setPagoModalidad('+id+',\'unico\')" style="flex:1;padding:7px;font-size:12px;font-weight:500;border-radius:8px;border:0.5px solid #f09595;background:#fcebeb;color:#a32d2d;cursor:pointer">Pago unico</button>'
     +'<button id="pmodc-'+id+'" onclick="setPagoModalidad('+id+',\'cuotas\')" style="flex:1;padding:7px;font-size:12px;font-weight:500;border-radius:8px;border:0.5px solid #f09595;background:#fff;color:#a32d2d;cursor:pointer">En cuotas</button>'
     +'</div>'
+    +'<div style="margin-bottom:10px"><label style="font-size:12px;color:#a32d2d;display:block;margin-bottom:4px">Recargo por financiación (%)</label>'
+    +'<input type="number" id="prc-'+id+'" placeholder="0" min="0" max="100" step="0.01" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #f09595;border-radius:8px;background:#fff" oninput="actualizarRecargo('+id+')">'
+    +'<div id="prc-label-'+id+'" style="font-size:12px;color:#a32d2d;margin-top:4px;font-weight:500"></div></div>'
     +'<div id="pfu-'+id+'">'
     +'<label style="font-size:12px;color:#a32d2d;display:block;margin-bottom:4px">Vencimiento</label>'
     +'<input type="date" id="pv-'+id+'" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #f09595;border-radius:8px;background:#fff">'
@@ -967,13 +970,23 @@ window.setPagoModalidad=function(id,mod){
   if(mod==='cuotas')generarCuotasPago(id);
 };
 
+window.actualizarRecargo=function(id){
+  const monto=parseFloat(document.getElementById('pm-'+id)?.value)||0;
+  const pct=parseFloat(document.getElementById('prc-'+id)?.value)||0;
+  const lbl=document.getElementById('prc-label-'+id);
+  if(lbl){if(pct>0&&monto>0){const extra=Math.round(monto*pct/100);lbl.textContent='Recargo: +'+fmt(extra)+' → Deuda: '+fmt(monto+extra);}else{lbl.textContent='';}}
+  generarCuotasPago(id);
+};
+
 window.generarCuotasPago=function(id){
   const n=parseInt(document.getElementById('pnc-'+id)?.value)||2;
   const primera=document.getElementById('ppc-'+id)?.value;
   const det=document.getElementById('pcd-'+id);
   const monto=parseFloat(document.getElementById('pm-'+id)?.value)||0;
   if(!primera||!det)return;
-  const mc=Math.round(monto/n);const mu=monto-(mc*(n-1));
+  const pct=parseFloat(document.getElementById('prc-'+id)?.value)||0;
+  const montoFinal=Math.round(monto*(1+pct/100));
+  const mc=Math.round(montoFinal/n);const mu=montoFinal-(mc*(n-1));
   let html='<div style="margin-top:4px">';
   for(let i=0;i<n;i++){const f=new Date(primera+'T00:00:00');f.setMonth(f.getMonth()+i);const fs=f.toISOString().slice(0,10);const m=i===n-1?mu:mc;html+='<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:0.5px solid #f09595;font-size:11px"><span>Cuota '+(i+1)+'/'+n+' · '+fs+'</span><span style="font-weight:500">'+fmt(m)+'</span></div>';}
   det.innerHTML=html+'</div>';
@@ -990,6 +1003,7 @@ window.actualizarRestante=function(){
   if(restante===0){el.style.cssText='display:block;font-size:13px;padding:8px 12px;border-radius:8px;margin-bottom:8px;background:#e1f5ee;color:#085041;border:0.5px solid #5dcaa5';el.textContent='Total cubierto';}
   else if(restante>0){el.style.cssText='display:block;font-size:13px;padding:8px 12px;border-radius:8px;margin-bottom:8px;background:#faeeda;color:#633806;border:0.5px solid #fac775';el.textContent='Falta asignar: '+fmt(restante);}
   else{el.style.cssText='display:block;font-size:13px;padding:8px 12px;border-radius:8px;margin-bottom:8px;background:#fcebeb;color:#a32d2d;border:0.5px solid #f09595';el.textContent='Excede el total en: '+fmt(Math.abs(restante));}
+  pagosTemp.filter(p=>p.tipo==='fiado').forEach(p=>{if(document.getElementById('prc-'+p.id))actualizarRecargo(p.id);});
 };
 
 window.guardarVenta=async function(){
@@ -1007,7 +1021,7 @@ window.guardarVenta=async function(){
   btn.disabled=true;btn.textContent='Registrando...';
   const productos=prodsTemp.map(id=>({desc:document.getElementById('pd-'+id)?.value||'',talle:document.getElementById('pt-'+id)?.value||'',cantidad:parseFloat(document.getElementById('pc-'+id)?.value)||1,precio:parseFloat(document.getElementById('pp-'+id)?.value)||0}));
   const fecha=document.getElementById('v-fecha').value||new Date().toISOString().slice(0,10);
-  const pagos=pagosTemp.map(p=>({tipo:p.tipo,monto:parseFloat(document.getElementById('pm-'+p.id)?.value)||0,modalidad:p.modalidad||'unico',vencimiento:document.getElementById('pv-'+p.id)?.value||'',ncuotas:parseInt(document.getElementById('pnc-'+p.id)?.value)||2,primeraC:document.getElementById('ppc-'+p.id)?.value||''}));
+  const pagos=pagosTemp.map(p=>({tipo:p.tipo,monto:parseFloat(document.getElementById('pm-'+p.id)?.value)||0,recargoPct:p.tipo==='fiado'?(parseFloat(document.getElementById('prc-'+p.id)?.value)||0):0,modalidad:p.modalidad||'unico',vencimiento:document.getElementById('pv-'+p.id)?.value||'',ncuotas:parseInt(document.getElementById('pnc-'+p.id)?.value)||2,primeraC:document.getElementById('ppc-'+p.id)?.value||''}));
   const tiposUnicos=[...new Set(pagos.map(p=>p.tipo))];
   const formaPago=tiposUnicos.length===1?tiposUnicos[0]:'mixto';
   const venta={clienteId:cliSelVId,clienteNombre:cliSelVNombre,productos,total,ajuste:window._ajL||'',formaPago,pagos,notas:document.getElementById('v-notas').value,fecha,fechaCreacion:new Date().toISOString()};
@@ -1037,11 +1051,13 @@ window.guardarVenta=async function(){
       const descBase='Venta '+(productos.map(p=>p.desc).join(', ')).substring(0,40);
       let nuevosMovs=[];
       for(const pf of pagosFiado){
+        const montoFiado=Math.round(pf.monto*(1+(pf.recargoPct||0)/100));
+        const sufRecargo=pf.recargoPct>0?' (recargo '+pf.recargoPct+'%)':'';
         if(pf.modalidad==='cuotas'&&pf.ncuotas>=2&&pf.primeraC){
-          const n=pf.ncuotas;const mc=Math.round(pf.monto/n);const mu=pf.monto-(mc*(n-1));
-          for(let i=0;i<n;i++){const f=new Date(pf.primeraC+'T00:00:00');f.setMonth(f.getMonth()+i);nuevosMovs.push({tipo:'cargo',monto:i===n-1?mu:mc,desc:descBase+(pagosFiado.length>1?' (fiado parcial)':'')+' (cuota '+(i+1)+'/'+n+')',fecha,vencimiento:f.toISOString().slice(0,10),id:Date.now()+i+Math.random()});}
+          const n=pf.ncuotas;const mc=Math.round(montoFiado/n);const mu=montoFiado-(mc*(n-1));
+          for(let i=0;i<n;i++){const f=new Date(pf.primeraC+'T00:00:00');f.setMonth(f.getMonth()+i);nuevosMovs.push({tipo:'cargo',monto:i===n-1?mu:mc,desc:descBase+(pagosFiado.length>1?' (fiado parcial)':'')+sufRecargo+' (cuota '+(i+1)+'/'+n+')',fecha,vencimiento:f.toISOString().slice(0,10),id:Date.now()+i+Math.random()});}
         } else {
-          nuevosMovs.push({tipo:'cargo',monto:pf.monto,desc:descBase+(pagosFiado.length>1?' (fiado parcial)':''),fecha,vencimiento:pf.vencimiento||'',id:Date.now()+Math.random()});
+          nuevosMovs.push({tipo:'cargo',monto:montoFiado,desc:descBase+(pagosFiado.length>1?' (fiado parcial)':'')+sufRecargo,fecha,vencimiento:pf.vencimiento||'',id:Date.now()+Math.random()});
         }
       }
       if(cuenta){const movs=[...(cuenta.movimientos||[]),...nuevosMovs];await fsPatch('cuentas',cuenta.id,{clienteId:cuenta.clienteId,clienteNombre:cuenta.clienteNombre,movimientos:movs,fechaCreacion:cuenta.fechaCreacion||''});cuenta.movimientos=movs;}
