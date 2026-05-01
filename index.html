@@ -917,6 +917,9 @@ window.agregarPago=function(){
     +'</div>'
     +'</div>';
   cont.appendChild(div);
+  const yaAsignado=pagosTemp.slice(0,-1).reduce((t,p)=>t+(parseFloat(document.getElementById('pm-'+p.id)?.value)||0),0);
+  const restanteAuto=Math.max(0,(window._tv||0)-yaAsignado);
+  if(restanteAuto>0){const inp=document.getElementById('pm-'+id);if(inp)inp.value=restanteAuto;}
   actualizarRestante();
 };
 
