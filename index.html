@@ -668,7 +668,7 @@ window.showTabV=function(t){
   ['lista','anuladas','nuevo'].forEach(s=>{document.getElementById('sec-v-'+s).classList.toggle('active',s===t);});
   if(t==='lista')renderVentas();
   if(t==='anuladas')renderAnuladas();
-  if(t==='nuevo'){document.getElementById('v-fecha').value=new Date().toISOString().slice(0,10);_savingVenta=false;pagosTemp=[];document.getElementById('pagos-container').innerHTML='';document.getElementById('pagos-restante').style.display='none';const b=document.getElementById('btn-save-v');if(b){b.disabled=false;b.textContent='Registrar venta';}}
+  if(t==='nuevo'){document.getElementById('v-fecha').value=new Date().toISOString().slice(0,10);_savingVenta=false;pagosTemp=[];prodsTemp=[];document.getElementById('pagos-container').innerHTML='';document.getElementById('pagos-restante').style.display='none';document.getElementById('prods-container').innerHTML='';document.getElementById('total-venta').textContent='$0';document.getElementById('aj-tipo').selectedIndex=0;document.getElementById('aj-valor').value='';document.getElementById('aj-label').textContent='';document.getElementById('subtotal-label').textContent='';window._tv=0;const b=document.getElementById('btn-save-v');if(b){b.disabled=false;b.textContent='Registrar venta';}}
 };
 window.showTabCC=function(t){['ccl','ccn'].forEach((s,i)=>{document.getElementById('tab-'+s).classList.toggle('active',i===(t==='lista'?0:1));document.getElementById('sec-cc-'+(i===0?'lista':'nuevo')).classList.toggle('active',i===(t==='lista'?0:1));});if(t==='lista')renderCuentas();};
 
