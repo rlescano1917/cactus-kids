@@ -537,6 +537,24 @@ function aplicarRoles(user) {
   }
 }
 
+// ── Cierre automático por inactividad ──────────────────────────
+let _sessionTimer=null;
+const SESSION_MS=60*60*1000; // 1 hora
+function _resetSessionTimer(){
+  if(!auth.currentUser)return;
+  clearTimeout(_sessionTimer);
+  _sessionTimer=setTimeout(async()=>{await signOut(auth);toast('Sesión cerrada por inactividad','err');},SESSION_MS);
+}
+function _iniciarSessionTimer(){
+  ['click','touchstart','keydown'].forEach(e=>document.addEventListener(e,_resetSessionTimer,{passive:true}));
+  _resetSessionTimer();
+}
+function _detenerSessionTimer(){
+  clearTimeout(_sessionTimer);_sessionTimer=null;
+  ['click','touchstart','keydown'].forEach(e=>document.removeEventListener(e,_resetSessionTimer));
+}
+// ───────────────────────────────────────────────────────────────
+
 onAuthStateChanged(auth, async user => {
   if (user) {
     document.getElementById('login-screen').style.display='none';
@@ -549,7 +567,9 @@ onAuthStateChanged(auth, async user => {
     const userConRol = {...user, displayName: rolDB};
     aplicarRoles(userConRol);
     initData();
+    _iniciarSessionTimer();
   } else {
+    _detenerSessionTimer();
     document.getElementById('login-screen').style.display='flex';
     document.getElementById('main-app').style.display='none';
   }
