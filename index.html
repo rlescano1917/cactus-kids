@@ -55,6 +55,7 @@ textarea{height:60px;resize:vertical}
 .badge.transferencia{background:#e6f1fb;color:#0c447c;border-color:#85b7eb}
 .badge.tarjeta{background:#faeeda;color:#633806;border-color:#fac775}
 .badge.fiado{background:#fcebeb;color:#791f1f;border-color:#f09595}
+.badge.cambio{background:#f3eefa;color:#5a2d82;border-color:#c084fc}
 .badge.aldia{background:#e1f5ee;color:#085041;border-color:#5dcaa5}
 .badge.porVencer{background:#faeeda;color:#633806;border-color:#fac775}
 .badge.vencida{background:#fcebeb;color:#791f1f;border-color:#f09595;font-weight:500}
@@ -86,6 +87,7 @@ textarea{height:60px;resize:vertical}
 .pago-btn.sel-transferencia{background:#e6f1fb;color:#0c447c;border-color:#85b7eb}
 .pago-btn.sel-tarjeta{background:#faeeda;color:#633806;border-color:#fac775}
 .pago-btn.sel-fiado{background:#fcebeb;color:#791f1f;border-color:#f09595}
+.pago-btn.sel-cambio{background:#f3eefa;color:#5a2d82;border-color:#c084fc}
 .prod-card{background:#f1efe8;border-radius:8px;padding:0.75rem;margin-bottom:8px;position:relative}
 .prod-card .rm{position:absolute;top:8px;right:8px;background:none;border:none;color:#5f5e5a;cursor:pointer;font-size:16px;padding:0}
 .saldo-box{background:#f1efe8;border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem}
@@ -901,6 +903,11 @@ window.agregarPago=function(){
     +'<button class="pago-btn" id="pttr-'+id+'" onclick="setPagoTipo('+id+',\'transferencia\')">Transferencia</button>'
     +'<button class="pago-btn" id="ptta-'+id+'" onclick="setPagoTipo('+id+',\'tarjeta\')">Tarjeta</button>'
     +'<button class="pago-btn" id="ptfi-'+id+'" onclick="setPagoTipo('+id+',\'fiado\')">Fiado</button>'
+    +'<button class="pago-btn" id="ptca-'+id+'" onclick="setPagoTipo('+id+',\'cambio\')" style="grid-column:1/-1">Cambio de prenda</button>'
+    +'</div>'
+    +'<div id="pago-cambio-'+id+'" style="display:none;margin-top:10px;background:#f3eefa;border-radius:8px;padding:10px">'
+    +'<label style="font-size:12px;color:#5a2d82;font-weight:500;display:block;margin-bottom:6px">Prenda devuelta</label>'
+    +'<input type="text" id="pdca-'+id+'" placeholder="Ej: Vestido floreado talle 4" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #c084fc;border-radius:8px;background:#fff">'
     +'</div>'
     +'<div><label style="font-size:12px;color:#5f5e5a;display:block;margin-bottom:4px">Monto ($)</label>'
     +'<input type="number" id="pm-'+id+'" placeholder="0" min="0" style="width:100%;font-size:14px;padding:7px 10px;border:0.5px solid #d3d1c7;border-radius:8px" oninput="actualizarRestante()"></div>'
@@ -951,14 +958,15 @@ window.quitarPago=function(id){
 window.setPagoTipo=function(id,tipo){
   const p=pagosTemp.find(x=>x.id===id);if(!p)return;
   p.tipo=tipo;
-  const map={efectivo:'ef',transferencia:'tr',tarjeta:'ta',fiado:'fi'};
-  Object.entries({ef:'efectivo',tr:'transferencia',ta:'tarjeta',fi:'fiado'}).forEach(([s,t])=>{
+  Object.entries({ef:'efectivo',tr:'transferencia',ta:'tarjeta',fi:'fiado',ca:'cambio'}).forEach(([s,t])=>{
     const b=document.getElementById('pt'+s+'-'+id);if(b)b.className='pago-btn'+(tipo===t?' sel-'+t:'');
   });
   const fd=document.getElementById('pago-fiado-'+id);
   if(fd){fd.style.display=tipo==='fiado'?'block':'none';
     if(tipo==='fiado'){const d=new Date();d.setDate(d.getDate()+30);const venc=document.getElementById('pv-'+id);if(venc&&!venc.value)venc.value=d.toISOString().slice(0,10);}
   }
+  const cd=document.getElementById('pago-cambio-'+id);
+  if(cd)cd.style.display=tipo==='cambio'?'block':'none';
 };
 
 window.setPagoModalidad=function(id,mod){
@@ -1021,7 +1029,7 @@ window.guardarVenta=async function(){
   btn.disabled=true;btn.textContent='Registrando...';
   const productos=prodsTemp.map(id=>({desc:document.getElementById('pd-'+id)?.value||'',talle:document.getElementById('pt-'+id)?.value||'',cantidad:parseFloat(document.getElementById('pc-'+id)?.value)||1,precio:parseFloat(document.getElementById('pp-'+id)?.value)||0}));
   const fecha=document.getElementById('v-fecha').value||new Date().toISOString().slice(0,10);
-  const pagos=pagosTemp.map(p=>({tipo:p.tipo,monto:parseFloat(document.getElementById('pm-'+p.id)?.value)||0,recargoPct:p.tipo==='fiado'?(parseFloat(document.getElementById('prc-'+p.id)?.value)||0):0,modalidad:p.modalidad||'unico',vencimiento:document.getElementById('pv-'+p.id)?.value||'',ncuotas:parseInt(document.getElementById('pnc-'+p.id)?.value)||2,primeraC:document.getElementById('ppc-'+p.id)?.value||''}));
+  const pagos=pagosTemp.map(p=>({tipo:p.tipo,monto:parseFloat(document.getElementById('pm-'+p.id)?.value)||0,recargoPct:p.tipo==='fiado'?(parseFloat(document.getElementById('prc-'+p.id)?.value)||0):0,descCambio:p.tipo==='cambio'?(document.getElementById('pdca-'+p.id)?.value.trim()||''):'',modalidad:p.modalidad||'unico',vencimiento:document.getElementById('pv-'+p.id)?.value||'',ncuotas:parseInt(document.getElementById('pnc-'+p.id)?.value)||2,primeraC:document.getElementById('ppc-'+p.id)?.value||''}));
   const tiposUnicos=[...new Set(pagos.map(p=>p.tipo))];
   const formaPago=tiposUnicos.length===1?tiposUnicos[0]:'mixto';
   const venta={clienteId:cliSelVId,clienteNombre:cliSelVNombre,productos,total,ajuste:window._ajL||'',formaPago,pagos,notas:document.getElementById('v-notas').value,fecha,fechaCreacion:new Date().toISOString()};
@@ -1091,7 +1099,7 @@ window.verVenta=function(id){
   const prods=v.productos?.length?v.productos.map(p=>'<div style="background:#f1efe8;border-radius:8px;padding:8px;margin-bottom:6px;font-size:13px;display:flex;justify-content:space-between"><span>'+esc(p.desc||'—')+(p.talle?' · '+esc(p.talle):'')+' x'+(p.cantidad||1)+'</span><span style="font-weight:500">'+fmt((p.precio||0)*(p.cantidad||1))+'</span></div>').join(''):'<span style="font-size:13px;color:#5f5e5a">Sin detalle</span>';
   const yaAnulada=v.estado==='anulada';
   const anulInfo=yaAnulada?'<div style="background:#fcebeb;border:0.5px solid #f09595;border-radius:8px;padding:10px 14px;margin-bottom:12px"><strong style="font-size:13px;color:#791f1f">Venta anulada</strong><div style="font-size:12px;color:#a32d2d;margin-top:2px">'+val(v.fechaAnulacion)+' · Por '+(v.anuladaPor||'—')+'</div><div style="font-size:12px;color:#a32d2d;margin-top:2px">Motivo: '+(v.motivoAnulacion||'—')+'</div></div>':'';
-  const pagosHtml=v.pagos?.length?v.pagos.map(p=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:0.5px solid #e0dfd8;font-size:13px"><span class="badge '+p.tipo+'">'+p.tipo+'</span><span style="font-weight:500">'+fmt(p.monto)+'</span></div>').join(''):'<span class="badge '+(v.formaPago||'efectivo')+'">'+(v.formaPago||'efectivo')+'</span>';
+  const pagosHtml=v.pagos?.length?v.pagos.map(p=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:0.5px solid #e0dfd8;font-size:13px"><span class="badge '+p.tipo+'">'+(p.tipo==='cambio'?'cambio'+(p.descCambio?' · '+esc(p.descCambio):''):p.tipo)+'</span><span style="font-weight:500">'+fmt(p.monto)+'</span></div>').join(''):'<span class="badge '+(v.formaPago||'efectivo')+'">'+(v.formaPago||'efectivo')+'</span>';
   abrirModal('<h3>Venta a '+esc(v.clienteNombre)+'</h3>'+anulInfo+'<div class="mf"><span>Fecha</span>'+val(v.fecha)+'</div>'+'<div class="mf"><span>Forma de pago</span>'+pagosHtml+'</div>'+(v.ajuste?'<div class="mf"><span>Ajuste</span>'+v.ajuste+'</div>':'')+'<div class="mf"><span>Productos</span>'+prods+'</div>'+'<div style="background:#1a1a18;border-radius:8px;padding:0.75rem 1rem;margin:0.75rem 0;display:flex;justify-content:space-between;align-items:center"><span style="color:#f1efe8;font-size:14px">Total</span><span style="color:#fff;font-size:18px;font-weight:500">'+fmt(v.total||0)+'</span></div>'+'<div class="mf"><span>Notas</span>'+val(v.notas)+'</div>'+'<div class="mactions">'+(!yaAnulada?'<button class="btn-del" style="background:#faeeda;color:#633806;border-color:#fac775" onclick="anularVenta(\''+v.id+'\')">Anular</button>':'')+(rolActual==='admin'&&!yaAnulada?'<button class="btn-del" onclick="eliminarVenta(\''+v.id+'\')">Eliminar</button>':'')+'<button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>');
 };
 window.eliminarVenta=async function(id){
@@ -2386,8 +2394,8 @@ window.renderStats = function() {
   const cuentasVencidas = cuentas.filter(c=>estadoCuenta(c)==='vencida').length;
   const clientesNuevos = clientes.filter(c => c.fechaAlta && c.fechaAlta.slice(0,7) >= desdeStr).length;
 
-  const formasPago = ['efectivo','transferencia','tarjeta','fiado'];
-  const colorPago = {efectivo:['#e1f5ee','#085041'],transferencia:['#e6f1fb','#0c447c'],tarjeta:['#faeeda','#633806'],fiado:['#fcebeb','#a32d2d']};
+  const formasPago = ['efectivo','transferencia','tarjeta','fiado','cambio'];
+  const colorPago = {efectivo:['#e1f5ee','#085041'],transferencia:['#e6f1fb','#0c447c'],tarjeta:['#faeeda','#633806'],fiado:['#fcebeb','#a32d2d'],cambio:['#f3eefa','#5a2d82']};
   const totalesPago = Object.fromEntries(formasPago.map(fp => [fp, ventasPer.filter(v=>v.formaPago===fp).reduce((t,v)=>t+(v.total||0),0)]));
 
   const mesesArray = [];
