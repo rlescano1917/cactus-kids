@@ -618,14 +618,18 @@ async function fsAdd(col,data) {
   const tk=await getToken();
   const h={'Content-Type':'application/json',...(tk?{Authorization:'Bearer '+tk}:{})};
   const r=await fetch(BASE+'/'+col,{method:'POST',headers:h,body:JSON.stringify(toFs(data))});
-  return parseDoc(await r.json());
+  const json=await r.json();
+  if(!r.ok)throw new Error(json?.error?.message||('HTTP '+r.status));
+  return parseDoc(json);
 }
 async function fsPatch(col,id,data) {
   const tk=await getToken();
   const h={'Content-Type':'application/json',...(tk?{Authorization:'Bearer '+tk}:{})};
   const mask=Object.keys(data).map(k=>'updateMask.fieldPaths='+k).join('&');
   const r=await fetch(BASE+'/'+col+'/'+id+'?'+mask,{method:'PATCH',headers:h,body:JSON.stringify(toFs(data))});
-  return parseDoc(await r.json());
+  const json=await r.json();
+  if(!r.ok)throw new Error(json?.error?.message||('HTTP '+r.status));
+  return parseDoc(json);
 }
 async function fsDel(col,id) {
   const tk=await getToken();
@@ -1856,7 +1860,7 @@ window.abrirTurno=async function(){
     turnos.unshift(doc);turnoActivo=doc;
     logAccion('caja','apertura',fmt(monto));
     renderTurnoActual();toast('Turno abierto','ok');
-  }catch(e){toast('Error al abrir turno','err');}
+  }catch(e){console.error('abrirTurno:',e);toast('Error al abrir turno: '+e.message,'err');}
 };
 
 window.registrarMovCaja=function(){
