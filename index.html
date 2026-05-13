@@ -41,7 +41,7 @@ textarea{height:60px;resize:vertical}
 .row:hover{border-color:#b4b2a9}
 .row.danger{border-color:#f09595;background:#fcebeb}
 .row.warn{border-color:#fac775}
-.avatar{width:40px;height:40px;border-radius:50%;background:#e6f1fb;color:#185fa5;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:14px;flex-shrink:0}
+.avatar{width:40px;height:40px;border-radius:50%;background:#e6f1fb;color:#185fa5;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:14px;flex-shrink:0;overflow:hidden}
 .avatar.danger{background:#fcebeb;color:#a32d2d}
 .avatar.warn{background:#faeeda;color:#633806}
 .avatar.ok{background:#e1f5ee;color:#0f6e56}
@@ -190,6 +190,12 @@ textarea{height:60px;resize:vertical}
         <div class="fg">
           <div><label>Nombre completo *</label><input id="f-nombre" type="text" placeholder="Maria"></div>
           <div><label>Apellido completo *</label><input id="f-apellido" type="text" placeholder="Gonzalez"></div>
+        </div>
+        <div class="fg full" style="margin-bottom:4px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div id="prev-foto-new" style="width:56px;height:56px;border-radius:50%;background:#e8e6df;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px;color:#b4b2a9;overflow:hidden">📷</div>
+            <div style="flex:1"><label>Foto del cliente</label><input type="file" id="f-foto" accept="image/*" onchange="previewFoto('f-foto','prev-foto-new')" style="width:100%;font-size:13px"></div>
+          </div>
         </div>
         <div class="fg">
           <div><label>DNI *</label><input id="f-dni" type="text" placeholder="12345678" oninput="checkDni()" maxlength="8">
@@ -708,6 +714,36 @@ window.cerrarModal=function(){document.getElementById('modal-bg').classList.remo
 function abrirModal(html){document.getElementById('modal-content').innerHTML=html;document.getElementById('modal-bg').classList.add('open');}
 function toast(msg,tipo){const t=document.getElementById('toast');t.textContent=msg;t.className='toast '+(tipo||'ok');t.style.display='block';setTimeout(()=>t.style.display='none',2800);}
 
+function comprimirFoto(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        const canvas=document.createElement('canvas');
+        canvas.width=150;canvas.height=150;
+        const ctx=canvas.getContext('2d');
+        const min=Math.min(img.width,img.height);
+        const sx=(img.width-min)/2,sy=(img.height-min)/2;
+        ctx.drawImage(img,sx,sy,min,min,0,0,150,150);
+        resolve(canvas.toDataURL('image/jpeg',0.7));
+      };
+      img.onerror=reject;
+      img.src=e.target.result;
+    };
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
+window.previewFoto=function(inputId,previewId){
+  const file=document.getElementById(inputId)?.files[0];
+  const prev=document.getElementById(previewId);
+  if(!file||!prev)return;
+  const reader=new FileReader();
+  reader.onload=e=>{prev.innerHTML='<img src="'+e.target.result+'" style="width:100%;height:100%;object-fit:cover">'; };
+  reader.readAsDataURL(file);
+};
+
 // ==================== CLIENTES ====================
 window.setFiltroCl=function(f,el){filtroCl=f;document.querySelectorAll('#sec-cl-lista .filtro').forEach(b=>b.classList.remove('active'));el.classList.add('active');renderClientes();};
 window.checkDni=function(){const dni=document.getElementById('f-dni').value.trim();const msg=document.getElementById('dni-msg');if(dni.length<7){msg.style.display='none';return;}const e=clientes.find(c=>c.dni===dni);msg.style.display='block';msg.style.color=e?'#a32d2d':'#0f6e56';msg.textContent=e?'Ya existe un cliente con este DNI':'DNI disponible';};
@@ -760,7 +796,9 @@ window.guardarCliente=async function(){
   btn.disabled=true;btn.textContent='Guardando...';
   const tel2=limpiarTel(document.getElementById('f-tel2')?.value||'');
   const tel2Desc=document.getElementById('f-tel2desc')?.value.trim()||'';
-  const c={nombre,apellido,dni,fnac:document.getElementById('f-fnac').value,tel,tel2,tel2Desc,email:document.getElementById('f-email').value,ciudad:document.getElementById('f-ciudad').value,origen:document.getElementById('f-origen').value,tipo:document.getElementById('f-tipo').value,notas:document.getElementById('f-notas').value,hijos:getHijos(hijosTemp),puntos:0,fechaAlta:new Date().toISOString()};
+  const fotoFile=document.getElementById('f-foto')?.files[0];
+  const foto=fotoFile?await comprimirFoto(fotoFile):'';
+  const c={nombre,apellido,dni,fnac:document.getElementById('f-fnac').value,tel,tel2,tel2Desc,email:document.getElementById('f-email').value,ciudad:document.getElementById('f-ciudad').value,origen:document.getElementById('f-origen').value,tipo:document.getElementById('f-tipo').value,notas:document.getElementById('f-notas').value,hijos:getHijos(hijosTemp),puntos:0,fechaAlta:new Date().toISOString(),foto};
   try{
     const doc=await fsAdd('clientes',c);clientes.unshift(doc);logAccion('cliente','crear',nombre+' '+apellido);
     limpiarFormCl();toast('Cliente guardado!','ok');showTabCl('lista');
@@ -771,6 +809,8 @@ window.guardarCliente=async function(){
 
 function limpiarFormCl(){
   ['f-nombre','f-apellido','f-dni','f-fnac','f-tel','f-email','f-ciudad','f-notas'].forEach(id=>document.getElementById(id).value='');
+  const ff=document.getElementById('f-foto');if(ff)ff.value='';
+  const pf=document.getElementById('prev-foto-new');if(pf)pf.innerHTML='📷';
   document.getElementById('f-origen').selectedIndex=0;document.getElementById('f-tipo').selectedIndex=0;
   document.getElementById('hijos-container').innerHTML='';document.getElementById('tel2-container').innerHTML='';
   document.getElementById('btn-add-tel2').style.display='';document.getElementById('alerta-critico').style.display='none';
@@ -792,7 +832,8 @@ function renderClientes(){
     const tp=cr?'<span class="badge critico">Sin credito</span>':c.tipo==='vip'?'<span class="badge vip">VIP</span>':'';
     const pts=(c.puntos||0);
     const ptsBadge=pts>0?'<span class="badge" style="background:#faeeda;color:#633806;border-color:#fac775">'+pts+' pts</span>':'';
-    return '<div class="row'+(cr?' danger':'')+'" onclick="verCliente(\''+c.id+'\')"><div class="avatar'+(cr?' danger':'')+'">'+ini.toUpperCase()+'</div><div class="info"><strong>'+esc(c.nombre)+' '+esc(c.apellido)+'</strong><span>DNI '+(c.dni?esc(c.dni):'—')+' · '+(c.tel?esc(c.tel):'Sin tel')+(c.ciudad?' · '+esc(c.ciudad):'')+'</span></div><div style="display:flex;gap:4px;flex-shrink:0">'+hj+tp+ptsBadge+'</div></div>';
+    const avatarCl=c.foto?'<img src="'+c.foto+'" style="width:100%;height:100%;object-fit:cover">':ini.toUpperCase();
+    return '<div class="row'+(cr?' danger':'')+'" onclick="verCliente(\''+c.id+'\')"><div class="avatar'+(cr?' danger':'')+'">'+avatarCl+'</div><div class="info"><strong>'+esc(c.nombre)+' '+esc(c.apellido)+'</strong><span>DNI '+(c.dni?esc(c.dni):'—')+' · '+(c.tel?esc(c.tel):'Sin tel')+(c.ciudad?' · '+esc(c.ciudad):'')+'</span></div><div style="display:flex;gap:4px;flex-shrink:0">'+hj+tp+ptsBadge+'</div></div>';
   }).join('');
 }
 
@@ -803,7 +844,8 @@ window.verCliente=function(id){
   const waUrl='https://wa.me/549'+c.tel+'?text='+encodeURIComponent('Hola '+c.nombre+'! Te registramos como cliente de Cactus Kids.');
   const wa2Url=c.tel2?'https://wa.me/549'+c.tel2+'?text='+encodeURIComponent('Hola '+c.nombre+'! Te registramos como cliente de Cactus Kids.'):'';
   const alerta=cr?'<div style="background:#fcebeb;border-radius:8px;padding:10px 14px;margin-bottom:1rem"><strong style="color:#791f1f;display:block">No otorgar credito ni fiado</strong><span style="font-size:13px;color:#a32d2d">Cliente critico.</span></div>':'';
-  abrirModal(alerta+'<h3>'+esc(c.nombre)+' '+esc(c.apellido)+'</h3>'
+  const fotoModal=c.foto?'<div style="display:flex;justify-content:center;margin-bottom:0.75rem"><img src="'+c.foto+'" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid #e0dfd8"></div>':'';
+  abrirModal(alerta+fotoModal+'<h3>'+esc(c.nombre)+' '+esc(c.apellido)+'</h3>'
     +'<div class="mf"><span>DNI</span>'+val(c.dni)+'</div>'
     +'<div class="mf"><span>Fecha de nac.</span>'+val(c.fnac)+'</div>'
     +'<div class="mf"><span>WhatsApp principal</span><div style="display:flex;align-items:center">'+(c.tel?esc(c.tel):'—')+(c.tel?'<a href="'+waUrl+'" target="_blank" class="wa-btn">Enviar WA</a>':'')+'</div></div>'
@@ -831,8 +873,10 @@ window.editarCliente=function(id){
   editHijosTemp=[];
   const tipoOpts=[['regular','Regular'],['vip','VIP'],['nuevo','Nuevo'],['inactivo','Inactivo'],['critico','Sin credito (critico)']].map(([v,l])=>'<option value="'+v+'"'+(c.tipo===v?' selected':'')+'>'+l+'</option>').join('');
   const origenOpts=['Redes sociales','Recomendacion','Paso por el local','WhatsApp','Otro'].map(o=>'<option'+(c.origen===o?' selected':'')+'>'+o+'</option>').join('');
+  const fotoActual=c.foto?'<img src="'+c.foto+'" style="width:100%;height:100%;object-fit:cover">':'📷';
   abrirModal('<h3>Editar cliente</h3>'
     +'<div class="fg"><div><label>Nombre completo *</label><input id="e-nombre" type="text" value="'+esc(c.nombre||'')+'" style="width:100%"></div><div><label>Apellido completo *</label><input id="e-apellido" type="text" value="'+esc(c.apellido||'')+'" style="width:100%"></div></div>'
+    +'<div class="fg full" style="margin-bottom:4px"><div style="display:flex;align-items:center;gap:12px"><div id="prev-foto-edit" style="width:56px;height:56px;border-radius:50%;background:#e8e6df;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px;color:#b4b2a9;overflow:hidden">'+fotoActual+'</div><div style="flex:1"><label>Foto del cliente</label><input type="file" id="e-foto" accept="image/*" onchange="previewFoto(\'e-foto\',\'prev-foto-edit\')" style="width:100%;font-size:13px"><div style="font-size:11px;color:#5f5e5a;margin-top:2px">Dejá vacío para mantener la foto actual</div></div></div></div>'
     +'<div class="fg"><div><label>DNI</label><input id="e-dni" type="text" value="'+esc(c.dni||'')+'" maxlength="8" style="width:100%"></div><div><label>Fecha de nac.</label><input id="e-fnac" type="date" value="'+esc(c.fnac||'')+'" style="width:100%"></div></div>'
     +'<div class="fg full"><div><label>WhatsApp principal *</label><input id="e-tel" type="tel" value="'+esc(c.tel||'')+'" style="width:100%"></div></div>'
     +'<div class="fg"><div><label>WA secundario</label><input id="e-tel2" type="tel" value="'+esc(c.tel2||'')+'" style="width:100%"></div><div><label>Descripcion</label><input id="e-tel2desc" type="text" value="'+esc(c.tel2Desc||'')+'" placeholder="marido, mama..." style="width:100%"></div></div>'
@@ -853,7 +897,10 @@ window.guardarEdicion=async function(id){
   const tel=limpiarTel(document.getElementById('e-tel').value);
   if(!nombre||!apellido){toast('Completa nombre y apellido','err');return;}
   if(!tel||tel.length<8){toast('El WhatsApp es obligatorio','err');return;}
-  const datos={nombre,apellido,dni:document.getElementById('e-dni').value.trim(),fnac:document.getElementById('e-fnac').value,tel,tel2:limpiarTel(document.getElementById('e-tel2').value),tel2Desc:document.getElementById('e-tel2desc').value.trim(),email:document.getElementById('e-email').value,ciudad:document.getElementById('e-ciudad').value,origen:document.getElementById('e-origen').value,tipo:document.getElementById('e-tipo').value,notas:document.getElementById('e-notas').value,hijos:getHijos(editHijosTemp)};
+  const eFotoFile=document.getElementById('e-foto')?.files[0];
+  const fotoExistente=clientes.find(x=>x.id===id)?.foto||'';
+  const eFoto=eFotoFile?await comprimirFoto(eFotoFile):fotoExistente;
+  const datos={nombre,apellido,dni:document.getElementById('e-dni').value.trim(),fnac:document.getElementById('e-fnac').value,tel,tel2:limpiarTel(document.getElementById('e-tel2').value),tel2Desc:document.getElementById('e-tel2desc').value.trim(),email:document.getElementById('e-email').value,ciudad:document.getElementById('e-ciudad').value,origen:document.getElementById('e-origen').value,tipo:document.getElementById('e-tipo').value,notas:document.getElementById('e-notas').value,hijos:getHijos(editHijosTemp),foto:eFoto};
   try{await fsPatch('clientes',id,datos);const idx=clientes.findIndex(c=>c.id===id);if(idx>=0)clientes[idx]={...clientes[idx],...datos};logAccion('cliente','editar',datos.nombre+' '+datos.apellido);toast('Cliente actualizado!','ok');cerrarModal();renderClientes();}
   catch(e){toast('Error al guardar','err');}
 };
@@ -879,7 +926,11 @@ window.buscarCliV=function(){
   if(q.length<2){res.innerHTML='';return;}
   const f=clientes.filter(c=>(c.nombre+' '+c.apellido+' '+(c.dni||'')).toLowerCase().includes(q)).slice(0,5);
   if(!f.length){res.innerHTML='<div style="font-size:13px;color:#5f5e5a;padding:4px 0">No encontrado.</div>';return;}
-  res.innerHTML=f.map(c=>'<div class="res-item" onclick="selCliV(\''+c.id+'\',\''+c.nombre+' '+c.apellido+'\')"><strong>'+c.nombre+' '+c.apellido+'</strong> <span style="color:#5f5e5a;font-size:12px">DNI '+(c.dni||'—')+'</span></div>').join('');
+  res.innerHTML=f.map(c=>{
+    const av=c.foto?'<img src="'+c.foto+'" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0">'
+      :'<div style="width:32px;height:32px;border-radius:50%;background:#e6f1fb;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;flex-shrink:0">'+((c.nombre[0]||'')+(c.apellido[0]||'')).toUpperCase()+'</div>';
+    return '<div class="res-item" style="display:flex;align-items:center;gap:8px" onclick="selCliV(\''+c.id+'\',\''+c.nombre+' '+c.apellido+'\')">'+av+'<div><strong>'+c.nombre+' '+c.apellido+'</strong> <span style="color:#5f5e5a;font-size:12px">DNI '+(c.dni||'—')+'</span></div></div>';
+  }).join('');
 };
 window.selCliV=function(id,nombre){cliSelVId=id;cliSelVNombre=nombre;document.getElementById('bus-cli-v').value='';document.getElementById('res-cli-v').innerHTML='';document.getElementById('cli-sel-v').style.display='block';document.getElementById('cli-sel-v-nombre').textContent=nombre;};
 
