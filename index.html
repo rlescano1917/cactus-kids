@@ -932,7 +932,21 @@ window.buscarCliV=function(){
     return '<div class="res-item" style="display:flex;align-items:center;gap:8px" onclick="selCliV(\''+c.id+'\',\''+c.nombre+' '+c.apellido+'\')">'+av+'<div><strong>'+c.nombre+' '+c.apellido+'</strong> <span style="color:#5f5e5a;font-size:12px">DNI '+(c.dni||'—')+'</span></div></div>';
   }).join('');
 };
-window.selCliV=function(id,nombre){cliSelVId=id;cliSelVNombre=nombre;document.getElementById('bus-cli-v').value='';document.getElementById('res-cli-v').innerHTML='';document.getElementById('cli-sel-v').style.display='block';document.getElementById('cli-sel-v-nombre').textContent=nombre;};
+window.selCliV=function(id,nombre){
+  cliSelVId=id;cliSelVNombre=nombre;
+  document.getElementById('bus-cli-v').value='';
+  document.getElementById('res-cli-v').innerHTML='';
+  const c=clientes.find(x=>x.id===id);
+  const fotoHtml=c?.foto
+    ?'<img src="'+c.foto+'" onclick="ampliarFoto(\''+c.foto+'\')" style="width:40px;height:40px;border-radius:50%;object-fit:cover;cursor:zoom-in;flex-shrink:0;border:2px solid #a8c8f0">'
+    :'';
+  const sel=document.getElementById('cli-sel-v');
+  sel.style.display='block';
+  sel.innerHTML=(fotoHtml?'<div style="display:flex;align-items:center;gap:10px">'+fotoHtml+'<span>Cliente: <strong>'+esc(nombre)+'</strong></span></div>':'Cliente: <strong>'+esc(nombre)+'</strong>');
+};
+window.ampliarFoto=function(src){
+  abrirModal('<div style="text-align:center"><img src="'+src+'" style="max-width:100%;max-height:70vh;border-radius:12px;object-fit:contain"></div><div class="mactions"><button class="btn-close" onclick="cerrarModal()">Cerrar</button></div>');
+};
 
 window.agregarProd=function(){
   const id=Date.now();prodsTemp.push(id);
